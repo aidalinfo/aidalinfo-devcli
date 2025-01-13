@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sort"
 	"bufio"
 	"fmt"
 	"os"
@@ -18,7 +19,7 @@ func listSubmodule(path string) ([]string, error) {
 	if path == "" {
 		path = "."
 	}
-	fmt.Println(path)
+	// fmt.Println(path)
 	// Chemin vers .gitmodules
 	gitModulesPath := filepath.Join(path, ".gitmodules")
 
@@ -158,4 +159,52 @@ func pushChanges(currentBranch, repoPath string) error {
 		return fmt.Errorf("Erreur lors du push : %s\n%s", err.Error(), string(output))
 	}
 	return nil
+}
+
+
+type Commit struct {
+    Date      string
+    Author    string
+    Message   string
+    Submodule string
+}
+
+func getLastCommits(submodules []string) ([]Commit, error) {
+    var allCommits []Commit
+    
+    for _, submodule := range submodules {
+        // On garde le hash dans le format uniquement pour le tri, mais on ne le stocke pas
+        cmd := exec.Command("git", "-C", submodule, "log", "-n", "3", "--pretty=format:%ai|%an|%s")
+        output, err := cmd.CombinedOutput()
+        if err != nil {
+            continue
+        }
+
+        commits := strings.Split(strings.TrimSpace(string(output)), "\n")
+        for _, commit := range commits {
+            if commit == "" {
+                continue
+            }
+            parts := strings.Split(commit, "|")
+            if len(parts) == 3 {
+                allCommits = append(allCommits, Commit{
+                    Date:      parts[0],
+                    Author:    parts[1],
+                    Message:   parts[2],
+                    Submodule: filepath.Base(submodule),
+                })
+            }
+        }
+    }
+
+    // Trier les commits par date (du plus récent au plus ancien)
+    sort.Slice(allCommits, func(i, j int) bool {
+        return allCommits[i].Date > allCommits[j].Date
+    })
+
+    // Retourner les 20 commits les plus récents
+    if len(allCommits) > 20 {
+        return allCommits[:20], nil
+    }
+    return allCommits, nil
 }

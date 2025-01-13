@@ -6,141 +6,298 @@ import (
 	"github.com/rivo/tview"
 )
 
-// RunUI démarre l'interface utilisateur
+
+// Ajouter cette fonction qui affiche les détails des sous-modules
+func showSubmodulesDetails(app *tview.Application, selectedSubmodules []string, grid *tview.Grid, list *tview.List) {
+    detailView := tview.NewFlex().SetDirection(tview.FlexRow)
+    
+    header := tview.NewTextView().
+        SetText("Aidalinfo devcli 🚀 - Détails des sous-modules").
+        SetTextAlign(tview.AlignCenter).
+        SetDynamicColors(true)
+    detailView.AddItem(header, 3, 0, false)
+
+    // Créer un Flex pour contenir tous les sous-modules
+    modulesContainer := tview.NewFlex().SetDirection(tview.FlexRow)
+
+    // Créer un tableau pour stocker toutes les listes de branches
+    branchesLists := make([]*tview.List, 0)
+    currentFocusIndex := 0
+
+    // Pour chaque sous-module sélectionné
+    for _, submodule := range selectedSubmodules {
+        currentBranch := getCurrentBranch(submodule)
+        branchView := tview.NewTextView().
+            SetDynamicColors(true).
+            SetText(fmt.Sprintf("[yellow]Branche actuelle : [white]%s", currentBranch)).
+            SetTextAlign(tview.AlignLeft).
+            SetWrap(true)
+
+        branchesList := tview.NewList()
+        branchesLists = append(branchesLists, branchesList)
+        branches := getBranches(submodule)
+
+        for _, branch := range branches {
+            if branch == "" {
+                continue
+            }
+            branchesList.AddItem(branch, "", 0, func(targetBranch string) func() {
+                return func() {
+                    diffSummary, err := getDiffSummary(currentBranch, targetBranch, submodule)
+                    if err != nil {
+                        errorModal := tview.NewModal().
+                            SetText(fmt.Sprintf("Erreur : %s", err)).
+                            AddButtons([]string{"OK"}).
+                            SetDoneFunc(func(int, string) {
+                                app.SetRoot(detailView, true)
+                            })
+                        app.SetRoot(errorModal, true)
+                        return
+                    }
+
+                    modal := tview.NewModal().
+                        SetText(fmt.Sprintf("Êtes-vous sûr de vouloir merger %s dans %s ?\n\nRésumé des différences :\n%s", 
+                            targetBranch, currentBranch, diffSummary)).
+                        AddButtons([]string{"Oui", "Non"}).
+                        SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+                            if buttonLabel == "Oui" {
+                                err := createMerge(currentBranch, targetBranch, submodule)
+                                if err != nil {
+                                    errorModal := tview.NewModal().
+                                        SetText(fmt.Sprintf("Erreur : %s", err)).
+                                        AddButtons([]string{"OK"}).
+                                        SetDoneFunc(func(int, string) {
+                                            app.SetRoot(detailView, true)
+                                        })
+                                    app.SetRoot(errorModal, true)
+                                } else {
+                                    successModal := tview.NewModal().
+                                        SetText(fmt.Sprintf("Le merge de %s dans %s a réussi.", 
+                                            targetBranch, currentBranch)).
+                                        AddButtons([]string{"OK"}).
+                                        SetDoneFunc(func(int, string) {
+                                            app.SetRoot(detailView, true)
+                                        })
+                                    app.SetRoot(successModal, true)
+                                }
+                            } else {
+                                app.SetRoot(detailView, true)
+                            }
+                        })
+                    app.SetRoot(modal, true)
+                }
+            }(branch))
+        }
+        branchesList.SetBorder(true).SetTitle("Branches disponibles")
+
+        moduleView := tview.NewFlex().
+            SetDirection(tview.FlexColumn).
+            AddItem(branchView, 0, 1, false).
+            AddItem(branchesList, 0, 3, true)
+
+        moduleTitle := tview.NewTextView().
+            SetText(fmt.Sprintf("[yellow]%s[white]", submodule)).
+            SetDynamicColors(true)
+
+        modulesContainer.AddItem(moduleTitle, 1, 0, false)
+        modulesContainer.AddItem(moduleView, 0, 1, true)
+        modulesContainer.AddItem(tview.NewBox().SetBackgroundColor(tcell.ColorGray), 1, 0, false)
+    }
+
+    detailView.AddItem(modulesContainer, 0, 1, true)
+
+    // Gestion du focus et des touches
+    detailView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+        switch event.Key() {
+        case tcell.KeyEscape:
+            app.SetRoot(grid, true).SetFocus(list)
+            return nil
+        case tcell.KeyTab:
+            // Passer au prochain sous-module
+            currentFocusIndex = (currentFocusIndex + 1) % len(branchesLists)
+            app.SetFocus(branchesLists[currentFocusIndex])
+            return nil
+        case tcell.KeyBacktab:
+            // Passer au sous-module précédent
+            currentFocusIndex--
+            if currentFocusIndex < 0 {
+                currentFocusIndex = len(branchesLists) - 1
+            }
+            app.SetFocus(branchesLists[currentFocusIndex])
+            return nil
+        }
+        return event
+    })
+
+    // Définir le focus initial sur la première liste de branches
+    if len(branchesLists) > 0 {
+        app.SetFocus(branchesLists[0])
+    }
+
+    app.SetRoot(detailView, true)
+}
+
 func RunUI(submodules []string, submoduleNames []string) {
-	// Créer une nouvelle application tview
-	app := tview.NewApplication()
+    app := tview.NewApplication()
+    selectedSubmodules := []string{}
 
-	// Définir la vue principale
-	var mainView tview.Primitive
+    // Liste des sous-modules
+    list := tview.NewList()
 
-	// Fonction pour afficher une vue détaillée d'un sous-module
-	showSubmoduleView := func(submoduleName string, submodulePath string) {
-		// Vue pour la branche actuelle
-		currentBranch := getCurrentBranch(submodulePath)
-		branchView := tview.NewTextView().
-			SetDynamicColors(true).
-			SetText(fmt.Sprintf("[yellow]Branche actuelle : [white]%s", currentBranch)).
-			SetTextAlign(tview.AlignLeft).
-			SetWrap(true)
+    // Récupérer les commits
+    commits, err := getLastCommits(submodules)
+    if err != nil {
+        panic(err)
+    }
 
-		// Vue pour la liste des branches disponibles
-		branchesList := tview.NewList()
-		branches := getBranches(submodulePath)
+    // Créer la vue des commits
+    commitsView := tview.NewTextView().
+        SetDynamicColors(true).
+        SetWrap(true).
+        SetScrollable(true)
+    
+    commitsView.SetBorder(true).SetTitle("Derniers commits")
 
-		var detailView *tview.Flex // Déclare detailView en dehors des closures
+    // Formater et afficher les commits
+    content := ""
+    for _, commit := range commits {
+        content += fmt.Sprintf(
+            "[yellow]%s[white]\n"+
+            "[blue]%s[white] - %s\n"+
+            "%s\n"+
+            "-------------------\n",
+            commit.Submodule,
+            commit.Date[:16],
+            commit.Author,
+            commit.Message,
+        )
+    }
+    commitsView.SetText(content)
 
-		for _, branch := range branches {
-			if branch == "" {
-				continue
-			}
-			branchesList.AddItem(branch, "", 0, func(targetBranch string) func() {
-				return func() {
-					// Obtenir le résumé des différences
-					diffSummary, err := getDiffSummary(currentBranch, targetBranch, submodulePath)
-					if err != nil {
-						errorModal := tview.NewModal().
-							SetText(fmt.Sprintf("Erreur : %s", err)).
-							AddButtons([]string{"OK"}).
-							SetDoneFunc(func(int, string) {
-								app.SetRoot(detailView, true)
-							})
-						app.SetRoot(errorModal, true)
-						return
-					}
-					// Demander confirmation pour le merge
-					modal := tview.NewModal().
-						SetText(fmt.Sprintf("Êtes-vous sûr de vouloir merger %s dans %s ? \n\nRésumé des différences :\n%s", targetBranch, currentBranch, diffSummary)).
-						AddButtons([]string{"Oui", "Non"}).
-						SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-							if buttonLabel == "Oui" {
-								// Effectuer le merge
-								err := createMerge(currentBranch, targetBranch, submodulePath)
-								if err != nil {
-									errorModal := tview.NewModal().
-										SetText(fmt.Sprintf("Erreur : %s", err)).
-										AddButtons([]string{"OK"}).
-										SetDoneFunc(func(int, string) {
-											app.SetRoot(detailView, true)
-										})
-									app.SetRoot(errorModal, true)
-								} else {
-									successModal := tview.NewModal().
-										SetText(fmt.Sprintf("Le merge de %s dans %s a réussi.", targetBranch, currentBranch)).
-										AddButtons([]string{"OK"}).
-										SetDoneFunc(func(int, string) {
-											app.SetRoot(detailView, true)
-										})
-									app.SetRoot(successModal, true)
-								}
-							} else {
-								app.SetRoot(detailView, true)
-							}
-						})
-					app.SetRoot(modal, true)
-				}
-			}(branch))
-		}
-		branchesList.SetBorder(true).SetTitle("Branches disponibles")
+    // SetInputCapture pour commitsView
+    commitsView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+        if event.Key() == tcell.KeyTab {
+            app.SetFocus(list)
+            return nil
+        }
+        return event
+    })
 
-		// Vue détaillée avec disposition
-		detailView = tview.NewFlex().
-			SetDirection(tview.FlexRow).
-			AddItem(tview.NewTextView().
-				SetText(fmt.Sprintf("[green]Aidalinfo devcli 🚀[/green]\n\n[submodule: %s]", submoduleName)).
-				SetTextAlign(tview.AlignCenter).
-				SetDynamicColors(true), 3, 1, false).
-			AddItem(tview.NewFlex().
-				SetDirection(tview.FlexColumn).
-				AddItem(branchView, 0, 1, false).
-				AddItem(branchesList, 0, 3, true), 0, 1, true)
+    // Barre latérale
+    sideBar := tview.NewTextView().
+        SetTextAlign(tview.AlignLeft).
+        SetDynamicColors(true)
+    sideBar.SetBorder(true).
+        SetTitle("Séléctionné(s)")
 
-		// Gestion de la touche Échap pour revenir à la vue principale
-		app.SetRoot(detailView, true).SetFocus(detailView)
-		detailView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-			if event.Key() == tcell.KeyEscape {
-				app.SetRoot(mainView, true).SetFocus(mainView)
-				return nil
-			}
-			return event
-		})
-	}
+    // Fonction pour mettre à jour la barre latérale
+    updateSidebar := func() {
+        content := ""
+        for _, module := range selectedSubmodules {
+            content += fmt.Sprintf("%s\n", module)
+        }
+        sideBar.SetText(content)
+    }
 
-	// Créer une liste des sous-modules
-	list := tview.NewList()
-	for i, submoduleName := range submoduleNames {
-		// Ajouter chaque sous-module avec le chemin complet
-		list.AddItem(submoduleName, "", 0, func(name, path string) func() {
-			return func() {
-				showSubmoduleView(name, path)
-			}
-		}(submoduleName, submodules[i]))
-	}
-	list.SetBorder(false) // Supprime uniquement la bordure
+    // Remplir la liste des sous-modules
+    for index, submoduleName := range submoduleNames {
+        idx := index
+        list.AddItem(submoduleName, "", 0, func() {
+            selected := false
+            for i, module := range selectedSubmodules {
+                if module == submodules[idx] {
+                    selectedSubmodules = append(selectedSubmodules[:i], selectedSubmodules[i+1:]...)
+                    selected = true
+                    break
+                }
+            }
+            if !selected {
+                selectedSubmodules = append(selectedSubmodules, submodules[idx])
+            }
+            updateSidebar()
+        })
+    }
+    list.SetBorder(true).SetTitle("Submodules")
 
-	// Barre d'état dynamique
-	statusBar := tview.NewTextView().
-		SetDynamicColors(true).
-		SetText("[green]main > Sélectionnez un sous-module").
-		SetTextAlign(tview.AlignLeft)
+    // Footer
+    footer := tview.NewTextView().
+        SetDynamicColors(true).
+        SetText("[green]i: chercher | n: suivant | espace: selectionner | tab: naviguer | ↑↓: scroll").
+        SetTextAlign(tview.AlignLeft)
 
-	// Gestion des événements pour mettre à jour la barre d'état
-	list.SetChangedFunc(func(index int, mainText, secondaryText string, shortcut rune) {
-		statusBar.SetText(fmt.Sprintf("[green]main > [blue]%s", mainText))
-	})
+    // Grid Layout
+    grid := tview.NewGrid().
+        SetRows(3, 0, 3).
+        SetColumns(40, 0, 30).
+        SetBorders(true).
+        AddItem(tview.NewTextView().
+            SetText("Aidalinfo devcli 🚀").
+            SetTextAlign(tview.AlignCenter).
+            SetDynamicColors(true), 0, 0, 1, 3, 0, 0, false).
+        AddItem(commitsView, 1, 0, 1, 1, 0, 100, false).
+        AddItem(list, 1, 1, 1, 1, 0, 100, true).
+        AddItem(sideBar, 1, 2, 1, 1, 0, 100, false).
+        AddItem(footer, 2, 0, 1, 3, 0, 0, false)
 
-	// Vue principale avec un titre
-	mainView = tview.NewFlex().
-		SetDirection(tview.FlexRow).
-		AddItem(tview.NewTextView().
-			SetText("Aidalinfo devcli 🚀").
-			SetTextAlign(tview.AlignCenter).
-			SetDynamicColors(true), 3, 1, false).
-		AddItem(list, 0, 1, true).
-		AddItem(statusBar, 1, 1, false)
+    // Gestion des touches pour la liste
+    list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+        if event.Key() == tcell.KeyRune {
+            switch event.Rune() {
+            case ' ':
+                index := list.GetCurrentItem()
+                selected := false
+                for i, module := range selectedSubmodules {
+                    if module == submodules[index] {
+                        selectedSubmodules = append(selectedSubmodules[:i], selectedSubmodules[i+1:]...)
+                        selected = true
+                        break
+                    }
+                }
+                if !selected {
+                    selectedSubmodules = append(selectedSubmodules, submodules[index])
+                }
+                updateSidebar()
+                return nil
+            case 'n':
+                if len(selectedSubmodules) > 0 {
+                    showSubmodulesDetails(app, selectedSubmodules, grid, list)
+                }
+                return nil
+            }
+        } else if event.Key() == tcell.KeyTab {
+            app.SetFocus(commitsView)
+            return nil
+        }
+        return event
+    })
 
-	// Définir la vue principale comme racine
-	if err := app.SetRoot(mainView, true).Run(); err != nil {
-		panic(err)
-	}
+    // Gestion du focus global
+    app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+        if app.GetFocus() == commitsView {
+            switch event.Key() {
+            case tcell.KeyUp:
+                row, _ := commitsView.GetScrollOffset()
+                commitsView.ScrollTo(row-1, 0)
+                return nil
+            case tcell.KeyDown:
+                row, _ := commitsView.GetScrollOffset()
+                commitsView.ScrollTo(row+1, 0)
+                return nil
+            case tcell.KeyPgUp:
+                row, _ := commitsView.GetScrollOffset()
+                commitsView.ScrollTo(row-10, 0)
+                return nil
+            case tcell.KeyPgDn:
+                row, _ := commitsView.GetScrollOffset()
+                commitsView.ScrollTo(row+10, 0)
+                return nil
+            }
+        }
+        return event
+    })
+
+    // Lancer l'application
+    if err := app.SetRoot(grid, true).SetFocus(list).Run(); err != nil {
+        panic(err)
+    }
 }
