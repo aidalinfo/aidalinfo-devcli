@@ -1,4 +1,4 @@
-name: Build and Release .deb
+name: Build dev cli
 
 on:
   push:
@@ -31,6 +31,7 @@ jobs:
     - name: Build the binary
       run: |
         GOOS=linux GOARCH=amd64 go build -o aidalinfo-cli .
+        chmod +x aidalinfo-cli
 
     - name: Create release and upload artifacts
       uses: softprops/action-gh-release@v1
