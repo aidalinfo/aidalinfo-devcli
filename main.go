@@ -6,7 +6,7 @@ import (
     // "regexp"
 )
 
-var VERSION = "0.1.0"
+var VERSION = "0.0.2"
 
 func main() {
     projectPath := flag.String("path", ".", "Chemin du projet")
@@ -16,7 +16,9 @@ func main() {
 	flag.Parse()
     // Appelle listSubmodule pour le répertoire courant
     // submodules, err := listSubmodule("/home/killian/dev/aidalinfo/PROJET-pulse-myIT")
-
+    if err := checkForUpdates(VERSION); err != nil {
+        fmt.Println("Erreur lors de la vérification des mises à jour:", err)
+    }
 
     // // Affiche les sous-modules trouvés
     // fmt.Println("Sous-modules trouvés :")
