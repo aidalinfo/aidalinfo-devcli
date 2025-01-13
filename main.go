@@ -92,12 +92,12 @@ func main() {
         fmt.Println("Aidalinfo devcli version", VERSION)
     } else {
         fmt.Println("Usage:")
-        fmt.Println("  --ui              Lancer l'interface utilisateur")
-        fmt.Println("  --path            Spécifier le chemin du projet")
-        fmt.Println("  --install         Installer les submodules")
-        fmt.Println("  --branch=\"X Y\"    Spécifier la ou les branches (X avec fallback sur Y)")
-        fmt.Println("  --npm             Installer les dépendances npm")
-        fmt.Println("  --full            Installation complète (submodules + npm)")
-        fmt.Println("  --version, -v     Afficher la version")
+        fmt.Println("  -ui              Lancer l'interface utilisateur")
+        fmt.Println("  -path            Spécifier le chemin du projet")
+        fmt.Println("  -install         Installer les submodules")
+        fmt.Println("  -branch=\"X Y\"    Spécifier la ou les branches (X avec fallback sur Y)")
+        fmt.Println("  -npm             Installer les dépendances npm")
+        fmt.Println("  -full            Installation complète (submodules + npm)")
+        fmt.Println("  -version, -v     Afficher la version")
 	}
 }
