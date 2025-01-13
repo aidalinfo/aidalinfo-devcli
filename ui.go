@@ -25,69 +25,73 @@ func showSubmodulesDetails(app *tview.Application, selectedSubmodules []string, 
     currentFocusIndex := 0
 
     // Pour chaque sous-module sélectionné
-    for _, submodule := range selectedSubmodules {
-        currentBranch := getCurrentBranch(submodule)
-        branchView := tview.NewTextView().
-            SetDynamicColors(true).
-            SetText(fmt.Sprintf("[yellow]Branche actuelle : [white]%s", currentBranch)).
-            SetTextAlign(tview.AlignLeft).
-            SetWrap(true)
-
-        branchesList := tview.NewList()
-        branchesLists = append(branchesLists, branchesList)
-        branches := getBranches(submodule)
-
-        for _, branch := range branches {
-            if branch == "" {
-                continue
-            }
-            branchesList.AddItem(branch, "", 0, func(targetBranch string) func() {
-                return func() {
-                    diffSummary, err := getDiffSummary(currentBranch, targetBranch, submodule)
-                    if err != nil {
-                        errorModal := tview.NewModal().
-                            SetText(fmt.Sprintf("Erreur : %s", err)).
-                            AddButtons([]string{"OK"}).
-                            SetDoneFunc(func(int, string) {
-                                app.SetRoot(detailView, true)
-                            })
-                        app.SetRoot(errorModal, true)
-                        return
-                    }
-
-                    modal := tview.NewModal().
-                        SetText(fmt.Sprintf("Êtes-vous sûr de vouloir merger %s dans %s ?\n\nRésumé des différences :\n%s", 
-                            targetBranch, currentBranch, diffSummary)).
-                        AddButtons([]string{"Oui", "Non"}).
-                        SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-                            if buttonLabel == "Oui" {
-                                err := createMerge(currentBranch, targetBranch, submodule)
-                                if err != nil {
-                                    errorModal := tview.NewModal().
-                                        SetText(fmt.Sprintf("Erreur : %s", err)).
-                                        AddButtons([]string{"OK"}).
-                                        SetDoneFunc(func(int, string) {
-                                            app.SetRoot(detailView, true)
-                                        })
-                                    app.SetRoot(errorModal, true)
-                                } else {
-                                    successModal := tview.NewModal().
-                                        SetText(fmt.Sprintf("Le merge de %s dans %s a réussi.", 
-                                            targetBranch, currentBranch)).
-                                        AddButtons([]string{"OK"}).
-                                        SetDoneFunc(func(int, string) {
-                                            app.SetRoot(detailView, true)
-                                        })
-                                    app.SetRoot(successModal, true)
-                                }
-                            } else {
-                                app.SetRoot(detailView, true)
-                            }
-                        })
-                    app.SetRoot(modal, true)
-                }
-            }(branch))
-        }
+	for _, submodule := range selectedSubmodules {
+		currentBranch := getCurrentBranch(submodule) 
+		submodulePath := submodule // Capture la valeur actuelle
+		
+		branchView := tview.NewTextView().
+			SetDynamicColors(true).
+			SetText(fmt.Sprintf("[yellow]Branche actuelle : [white]%s", currentBranch)).
+			SetTextAlign(tview.AlignLeft).
+			SetWrap(true)
+	
+		branchesList := tview.NewList()
+		branchesLists = append(branchesLists, branchesList)
+		branches := getBranches(submodulePath)
+	
+		for _, branch := range branches {
+			if branch == "" {
+				continue
+			}
+			// Capture les valeurs actuelles pour la closure
+			branchName := branch
+			currentBranchName := currentBranch
+			
+			branchesList.AddItem(branchName, "", 0, func() {
+				diffSummary, err := getDiffSummary(currentBranchName, branchName, submodulePath)
+				if err != nil {
+					errorModal := tview.NewModal().
+						SetText(fmt.Sprintf("Erreur : %s", err)).
+						AddButtons([]string{"OK"}).
+						SetDoneFunc(func(int, string) {
+							app.SetRoot(detailView, true)
+						})
+					app.SetRoot(errorModal, true)
+					return
+				}
+	
+				modal := tview.NewModal().
+					SetText(fmt.Sprintf("Êtes-vous sûr de vouloir merger %s dans %s ?\n\nRésumé des différences :\n%s", 
+						branchName, currentBranchName, diffSummary)).
+					AddButtons([]string{"Oui", "Non"}).
+					SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+						if buttonLabel == "Oui" {
+							err := createMerge(currentBranchName, branchName, submodulePath)
+							if err != nil {
+								errorModal := tview.NewModal().
+									SetText(fmt.Sprintf("Erreur : %s", err)).
+									AddButtons([]string{"OK"}).
+									SetDoneFunc(func(int, string) {
+										app.SetRoot(detailView, true)
+									})
+								app.SetRoot(errorModal, true)
+							} else {
+								successModal := tview.NewModal().
+									SetText(fmt.Sprintf("Le merge de %s dans %s a réussi.", 
+										branchName, currentBranchName)).
+									AddButtons([]string{"OK"}).
+									SetDoneFunc(func(int, string) {
+										app.SetRoot(detailView, true)
+									})
+								app.SetRoot(successModal, true)
+							}
+						} else {
+							app.SetRoot(detailView, true)
+						}
+					})
+				app.SetRoot(modal, true)
+			})
+		}
         branchesList.SetBorder(true).SetTitle("Branches disponibles")
 
         moduleView := tview.NewFlex().

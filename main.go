@@ -6,7 +6,7 @@ import (
     // "regexp"
 )
 
-var VERSION = "0.0.2"
+var VERSION = "0.0.3"
 
 func main() {
     projectPath := flag.String("path", ".", "Chemin du projet")
