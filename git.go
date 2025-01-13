@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
     "regexp"
+	"os/exec"
 )
 
 // listSubmodule : Récupère les sous-modules récursivement et retourne leurs chemins
@@ -75,4 +76,45 @@ func cleanSubmodule(submodules []string) ([]string, error)  {
         }
     }
 	return submoduleNames, nil
+}
+
+
+// Fonction pour exécuter "git status" dans un sous-module
+func gitStatus(submodule string) string {
+	cmd := exec.Command("git", "-C", submodule, "status")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Sprintf("Erreur : %s", err.Error())
+	}
+	return string(output)
+}
+
+
+// Fonction pour obtenir la branche actuelle du sous-module
+func getCurrentBranch(path string) string {
+	cmd := exec.Command("git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Sprintf("Erreur : %s", err.Error())
+	}
+	return strings.TrimSpace(string(output))
+}
+
+// Fonction pour obtenir la liste des branches disponibles
+func getBranches(path string) []string {
+	// Effectuer un git fetch pour récupérer les branches distantes
+	fetchCmd := exec.Command("git", "-C", path, "fetch", "--all", "--prune")
+	if err := fetchCmd.Run(); err != nil {
+		return []string{fmt.Sprintf("Erreur lors du fetch : %s", err.Error())}
+	}
+	cmd := exec.Command("git", "-C", path, "branch", "-a", "--list")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return []string{fmt.Sprintf("Erreur : %s", err.Error())}
+	}
+	branches := strings.Split(string(output), "\n")
+	for i := range branches {
+		branches[i] = strings.TrimSpace(branches[i])
+	}
+	return branches
 }
