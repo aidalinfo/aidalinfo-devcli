@@ -118,3 +118,44 @@ func getBranches(path string) []string {
 	}
 	return branches
 }
+
+
+// Fonction pour effectuer un merge
+func createMerge(currentBranch, targetBranch, repoPath string) error {
+	cmd := exec.Command("git", "-C", repoPath, "merge", "--no-ff",targetBranch)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Erreur lors du merge : %s\n%s", err.Error(), string(output))
+	}
+	// Effectuer le push
+	pushCmd := exec.Command("git", "-C", repoPath, "push", "origin", currentBranch)
+	pushOutput, pushErr := pushCmd.CombinedOutput()
+	if pushErr != nil {
+		return fmt.Errorf("Erreur lors du push : %s\n%s", pushErr.Error(), string(pushOutput))
+	}
+	return nil
+}
+
+
+func getDiffSummary(currentBranch, targetBranch, repoPath string) (string, error) {
+	cmd := exec.Command("git", "-C", repoPath, "diff", "--shortstat", currentBranch+".."+targetBranch)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("Erreur lors de l'obtention des différences : %s\n%s", err.Error(), string(output))
+	}
+	diffSummary := strings.TrimSpace(string(output))
+	if diffSummary == "" {
+		return "Aucune différence entre les deux branches", nil
+	}
+	return diffSummary, nil
+}
+
+// Fonction pour effectuer un push
+func pushChanges(currentBranch, repoPath string) error {
+	cmd := exec.Command("git", "-C", repoPath, "push", "origin", currentBranch)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Erreur lors du push : %s\n%s", err.Error(), string(output))
+	}
+	return nil
+}
