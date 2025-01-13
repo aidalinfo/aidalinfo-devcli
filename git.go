@@ -208,3 +208,18 @@ func getLastCommits(submodules []string) ([]Commit, error) {
     }
     return allCommits, nil
 }
+
+
+// Fonction pour récupérer la branche par défaut de GitHub
+func getDefaultBranch() (string, error) {
+    cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+    output, err := cmd.Output()
+    if err != nil {
+        return "", fmt.Errorf("impossible de déterminer la branche par défaut : %v", err)
+    }
+
+    // Extraire la branche par défaut du chemin
+    defaultBranch := strings.TrimSpace(strings.TrimPrefix(string(output), "refs/remotes/origin/"))
+    fmt.Printf(" 👉 Branche par défaut détectée : %s\n", defaultBranch)
+    return defaultBranch, nil
+}
