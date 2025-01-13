@@ -91,7 +91,7 @@ func downloadAndReplace(latestVersion string) error {
 }
 
 func checkForUpdates(currentVersion string) error {
-    fmt.Printf("Vérification des mises à jour pour : %s\n", REPO_URL)
+    fmt.Printf("Vérification des mises à jour ...\n")
 
     cmd := exec.Command("git", "ls-remote", "--tags", REPO_URL)
     output, err := cmd.Output()
