@@ -8,7 +8,7 @@ import (
     "os"
     "os/exec"
     "path/filepath"
-    // "runtime"
+    "runtime"
     "strings"
 )
 var REPO_URL  = "https://github.com/aidalinfo/aidalinfo-devcli"
@@ -24,9 +24,10 @@ func promptForUpdate() bool {
 
 func downloadAndReplace(latestVersion string) error {
     // Construire l'URL de téléchargement en fonction de l'OS et l'architecture
-    // arch := runtime.GOARCH
-    // osName := runtime.GOOS
-    downloadURL := fmt.Sprintf("%s/releases/download/v%s/aidalinfo-cli", REPO_URL, latestVersion)
+    arch := runtime.GOARCH
+    osName := runtime.GOOS
+    downloadURL := fmt.Sprintf("%s/releases/download/v%s/aidalinfo-cli_%s_%s", REPO_URL, latestVersion, osName, arch)
+    fmt.Println(downloadURL)
     // Créer un fichier temporaire
     tmpFile, err := os.CreateTemp("", "aidalinfo-devcli")
     if err != nil {

@@ -30,14 +30,20 @@ jobs:
 
     - name: Build the binary
       run: |
-        GOOS=linux GOARCH=amd64 go build -o aidalinfo-cli .
-        chmod +x aidalinfo-cli
+        GOOS=linux GOARCH=amd64 go build -o aidalinfo-cli_linux_amd64 .
+        GOOS=darwin GOARCH=amd64 go build -o aidalinfo-cli_darwin_amd64 .
+        GOOS=darwin GOARCH=arm64 go build -o aidalinfo-cli_darwin_arm64 .
+        chmod +x aidalinfo-cli_linux_amd64
+        chmod +x aidalinfo-cli_darwin_amd64
+        chmod +x aidalinfo-cli_darwin_arm64
 
     - name: Create release and upload artifacts
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          aidalinfo-cli
+          aidalinfo-cli_linux_amd64
+          aidalinfo-cli_darwin_amd64
+          aidalinfo-cli_darwin_arm64
 
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

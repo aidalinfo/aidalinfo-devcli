@@ -8,7 +8,7 @@ import (
     "strings"
 )
 
-var VERSION = "0.0.3"
+var VERSION = "0.0.4"
 
 func main() {
     projectPath := flag.String("path", ".", "Chemin du projet")
@@ -66,14 +66,6 @@ func main() {
         }
         return
     }
-
-    // // Affiche les sous-modules trouvés
-    // fmt.Println("Sous-modules trouvés :")
-    // for _, submodule := range submodules {
-    //     fmt.Println(submodule)
-    // }
-
-
 	if *uiMode {
         submodules, err := listSubmodule(*projectPath)
         if err != nil {
