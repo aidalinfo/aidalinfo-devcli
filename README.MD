@@ -46,6 +46,7 @@ Vérification des mises à jour ...
 Vous utilisez la dernière version disponible.
 Usage:
   -ui              Lancer l'interface utilisateur
+  -ui-devops       Lancer l'interface DevOps (only tags pour le moment)
   -path            Spécifier le chemin du projet
   -install         Installer les submodules
   -branch="X Y"    Spécifier la ou les branches (X avec fallback sur Y)
@@ -83,7 +84,7 @@ aidalinfo-cli -ui
 
 Une fois dans cette interface, avec tab vous pouvez naviguer entre la liste des subdmodules ou l'historique des commits.
 
-Pour sélectionner des submodules pour effectuer des merges, il suffit de le sélectionner avec la touche espace ou entrer. 
+Pour sélectionner des submodules afin d'effectuer des merges, il suffit de le sélectionner avec la touche espace ou entrer. 
 
 Vous verrez les submodules sélectionnés à droite, pour passer à la suite il faut appuyer sur la touche n (next).
 Un petit temps de chargement peut s'ajouter en fonction du nombre de submodules sélectionnés.
