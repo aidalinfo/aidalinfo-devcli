@@ -27,7 +27,7 @@ func downloadAndReplace(latestVersion string) error {
     arch := runtime.GOARCH
     osName := runtime.GOOS
     downloadURL := fmt.Sprintf("%s/releases/download/v%s/aidalinfo-cli_%s_%s", REPO_URL, latestVersion, osName, arch)
-    fmt.Println(downloadURL)
+    // fmt.Println(downloadURL)
     // Créer un fichier temporaire
     tmpFile, err := os.CreateTemp("", "aidalinfo-devcli")
     if err != nil {

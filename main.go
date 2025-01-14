@@ -8,7 +8,7 @@ import (
     "strings"
 )
 
-var VERSION = "0.0.4"
+var VERSION = "0.0.5"
 
 func main() {
     projectPath := flag.String("path", ".", "Chemin du projet")
@@ -20,9 +20,9 @@ func main() {
     branchArg := flag.String("branch", "", "Spécifier la ou les branches (séparées par un espace)")
     npmCmd := flag.Bool("npm", false, "Installer les dépendances npm")
     fullCmd := flag.Bool("full", false, "Installation complète (submodules + npm)")
+    devopsCmd := flag.Bool("ui-devops", false, "Lancer l'interface DevOps")
 	flag.Parse()
-    // Appelle listSubmodule pour le répertoire courant
-    // submodules, err := listSubmodule("/home/killian/dev/aidalinfo/PROJET-pulse-myIT")
+
     if err := checkForUpdates(VERSION); err != nil {
         fmt.Println("Erreur lors de la vérification des mises à jour:", err)
     }
@@ -82,9 +82,19 @@ func main() {
 		RunUI(submodules, submoduleNames)
 	} else if *version || *v {
         fmt.Println("Aidalinfo devcli version", VERSION)
+    } else if *devopsCmd {
+        // Appelle cleanSubmodule pour nettoyer les chemins
+        submodules, err := listSubmodule(*projectPath)
+        submoduleNames, err := cleanSubmodule(submodules)
+        if err != nil {
+            fmt.Println("Erreur :", err)
+            return
+        }
+        RunDevOpsUI(submodules, submoduleNames)
     } else {
         fmt.Println("Usage:")
         fmt.Println("  -ui              Lancer l'interface utilisateur")
+        fmt.Println("  -ui-devops       Lancer l'interface DevOps (only tags pour le moment)")
         fmt.Println("  -path            Spécifier le chemin du projet")
         fmt.Println("  -install         Installer les submodules")
         fmt.Println("  -branch=\"X Y\"    Spécifier la ou les branches (X avec fallback sur Y)")

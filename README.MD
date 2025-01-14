@@ -97,4 +97,17 @@ Il suffit de sélectionner une branche et de cliquer sur espace ou entrer, l'out
 
 Pour naviguer sur un autre submodule, il suffit de cliquer sur la touche tab.
 
+### Gestion des tags
 
+Les tags peuvent être créés à partir de la cli aussi.
+
+Il suffit de lancer l'interface DevOps avec l'option -ui-devops.
+
+```bash	
+aidalinfo-cli -ui-devops
+```
+
+![Tags](img_doc/tags.png)
+
+Vous pouvez créer un tag avec le bouton "Créer un tag" qui est associé pour chaque submodule.
+Un formulaire vous permet de saisir la version du tag et le message associé. (le tag sera push directement après la création)

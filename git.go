@@ -223,3 +223,54 @@ func getDefaultBranch() (string, error) {
     fmt.Printf(" 👉 Branche par défaut détectée : %s\n", defaultBranch)
     return defaultBranch, nil
 }
+
+
+//Fonction qui récupère d'un repos
+func getLastTags(repoPath string) ([]string, []string, error) {
+    // Obtenir tous les tags triés par date
+    cmd := exec.Command("git", "-C", repoPath, "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)", "refs/tags/")
+    output, err := cmd.Output()
+    if err != nil {
+        return nil, nil, fmt.Errorf("Erreur lors de la récupération des tags : %s\n%s", err.Error(), string(output))
+    }
+
+    // Séparer les tags en `v*` et `rc-*`
+    tags := strings.Split(string(output), "\n")
+    var vTags []string
+    var rcTags []string
+
+    for _, tag := range tags {
+        if strings.HasPrefix(tag, "v") {
+            vTags = append(vTags, tag)
+        } else if strings.HasPrefix(tag, "rc-") {
+            rcTags = append(rcTags, tag)
+        }
+    }
+
+    return vTags, rcTags, nil
+}
+
+//Creation d'un tag
+func createTag(repoPath, version, message string) error {
+	cmd := exec.Command("git", "-C", repoPath, "tag", "-a", version, "-m", message)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Erreur : %s\n%s", err, string(output))
+	}
+	pushCmd := exec.Command("git", "-C", repoPath, "push", "--tags")
+	output, err = pushCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Erreur lors du push des tags : %s\n%s", err, string(output))
+	}
+	return nil
+}
+
+// Fonction pour récupérer les modifications en attente
+func getWaitingChanges(repoPath string) (string, error) {
+	cmd := exec.Command("git", "-C", repoPath, "status", "--porcelain")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("Erreur lors de la récupération des modifications : %s\n%s", err, string(output))
+	}
+	return strings.TrimSpace(string(output)), nil
+}
