@@ -123,7 +123,7 @@ func getBranches(path string) []string {
 
 // Fonction pour effectuer un merge
 func createMerge(currentBranch, targetBranch, repoPath string) error {
-	cmd := exec.Command("git", "-C", repoPath, "merge", "--no-ff",targetBranch)
+	cmd := exec.Command("git", "-C", repoPath, "merge", "--no-ff", targetBranch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Erreur lors du merge : %s\n%s", err.Error(), string(output))
@@ -273,4 +273,13 @@ func getWaitingChanges(repoPath string) (string, error) {
 		return "", fmt.Errorf("Erreur lors de la récupération des modifications : %s\n%s", err, string(output))
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+func changeBranche(repoPath, branch string) error {
+	cmd := exec.Command("git", "-C", repoPath, "checkout", branch)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Erreur lors du changement de branche : %s\n%s", err, string(output))
+	}
+	return nil
 }

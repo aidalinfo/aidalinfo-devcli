@@ -200,6 +200,146 @@ func showCreateTagModal(app *tview.Application, repoPath string, previousView tv
 }
 
 
+func showSubmoduleMergeDetails(app *tview.Application, selectedSubmodules []string, grid *tview.Grid, list *tview.List) {
+	detailView := tview.NewFlex().SetDirection(tview.FlexRow)
+
+	// Header
+	header := tview.NewTextView().
+		SetText("Aidalinfo devcli 🚀 - Gestion des merges").
+		SetTextAlign(tview.AlignCenter).
+		SetDynamicColors(true)
+	detailView.AddItem(header, 3, 0, false)
+
+	// Conteneur principal pour tous les sous-modules
+	modulesContainer := tview.NewFlex().SetDirection(tview.FlexRow)
+	focusableElements := make([]tview.Primitive, 0)
+	currentFocusIndex := 0
+
+	for _, submodule := range selectedSubmodules {
+		submodulePath := submodule
+		currentBranch := getCurrentBranch(submodulePath)
+		var targetBranch string // Branche distante sélectionnée
+		mergeSummary := tview.NewTextView().SetDynamicColors(true).SetWrap(true)
+
+		// Nom du sous-module et branche actuelle
+		submoduleNameView := tview.NewTextView().
+			SetText(fmt.Sprintf("[green]Sous-module : [white]%s\n[yellow]Branche actuelle : [white]%s", submodule, currentBranch)).
+			SetDynamicColors(true).
+			SetTextAlign(tview.AlignLeft)
+
+		// Bouton pour effectuer un merge
+		mergeButton := tview.NewButton("Merge").SetSelectedFunc(func() {
+			if targetBranch == "" {
+				mergeSummary.SetText("[red]Veuillez sélectionner une branche distante avant de merger.")
+				return
+			}
+
+			confirmation := tview.NewModal().
+			SetText(fmt.Sprintf("Voulez-vous merger la branche actuelle [%s] dans la branche distante [%s] ?", currentBranch, targetBranch)).
+				AddButtons([]string{"Oui", "Non"}).
+				SetDoneFunc(func(index int, label string) {
+					if label == "Oui" {
+						err := createMerge(currentBranch, targetBranch, submodulePath)
+						if err != nil {
+							app.SetRoot(tview.NewModal().
+								SetText(fmt.Sprintf("Erreur lors du merge : %v", err)).
+								AddButtons([]string{"OK"}), true)
+						} else {
+							app.SetRoot(tview.NewModal().
+								SetText("Merge réussi !").
+								AddButtons([]string{"OK"}), true)
+						}
+					}
+					app.SetRoot(detailView, true)
+				})
+			app.SetRoot(confirmation, true)
+		})
+		mergeButton.SetBorder(true)
+		focusableElements = append(focusableElements, mergeButton)
+		// Liste des branches locales
+		localBranches := tview.NewList()
+		localBranches.SetBorder(true).SetTitle("Branches disponibles")
+		branches := getBranches(submodulePath)
+		for _, branch := range branches {
+			branchName := branch // Capturer la variable pour l'utilisation dans le callback
+			localBranches.AddItem(branchName, "", 0, func() {
+				confirmation := tview.NewModal().
+					SetText(fmt.Sprintf("Changer pour la branche  : %s ?", branchName)).
+					AddButtons([]string{"Oui", "Non"}).
+					SetDoneFunc(func(index int, label string) {
+						if label == "Oui" {
+							err := changeBranche(submodulePath, branchName)
+							if err != nil {
+								app.SetRoot(tview.NewModal().
+									SetText(fmt.Sprintf("Erreur : %v", err)).
+									AddButtons([]string{"OK"}), true)
+							} else {
+								currentBranch = branchName
+								submoduleNameView.SetText(fmt.Sprintf("[green]Sous-module : [white]%s\n[yellow]Branche actuelle : [white]%s", submodule, branchName))
+							}
+						}
+						app.SetRoot(detailView, true)
+					})
+				app.SetRoot(confirmation, true)
+			})
+		}
+		focusableElements = append(focusableElements, localBranches)
+
+		// Liste des branches distantes
+		remoteBranches := tview.NewList()
+		remoteBranches.SetBorder(true).SetTitle("Branches à merger")
+		for _, branch := range branches {
+			branchName := branch // Capturer la variable pour l'utilisation dans le callback
+			remoteBranches.AddItem(branchName, "", 0, func() {
+				targetBranch = branchName
+				diff, err := getDiffSummary(currentBranch, targetBranch, submodulePath)
+				if err != nil {
+					diff = fmt.Sprintf("[red]Erreur lors de la récupération des différences : %v", err)
+				}
+				mergeSummary.SetText(fmt.Sprintf("[green]Merge vers : %s <- %s\n[white]%s", currentBranch, targetBranch, diff))
+			})
+		}
+		focusableElements = append(focusableElements, remoteBranches)
+
+		// Vue combinée pour ce sous-module
+		moduleView := tview.NewFlex().SetDirection(tview.FlexColumn).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(submoduleNameView, 3, 0, false).
+				AddItem(mergeSummary, 0, 1, false).
+				AddItem(mergeButton, 2, 0, true), 0, 1, false).
+			AddItem(localBranches, 0, 2, true).
+			AddItem(remoteBranches, 0, 2, true)
+
+		modulesContainer.AddItem(moduleView, 0, 1, true).
+			AddItem(tview.NewBox().SetBackgroundColor(tcell.ColorGray), 1, 0, false)
+	}
+
+	detailView.AddItem(modulesContainer, 0, 1, true)
+
+	// Gestion des touches
+	detailView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		totalElements := len(focusableElements)
+		switch event.Key() {
+		case tcell.KeyEscape:
+			app.SetRoot(grid, true).SetFocus(list)
+			return nil
+		case tcell.KeyTab:
+			currentFocusIndex = (currentFocusIndex + 1) % totalElements
+			app.SetFocus(focusableElements[currentFocusIndex])
+			return nil
+		case tcell.KeyBacktab:
+			currentFocusIndex--
+			if currentFocusIndex < 0 {
+				currentFocusIndex = totalElements - 1
+			}
+			app.SetFocus(focusableElements[currentFocusIndex])
+			return nil
+		}
+		return event
+	})
+
+	app.SetRoot(detailView, true)
+}
 
 
 func RunDevOpsUI(submodules []string, submoduleNames []string) {
@@ -285,7 +425,7 @@ func RunDevOpsUI(submodules []string, submoduleNames []string) {
 	    // Footer
 		footer := tview.NewTextView().
         SetDynamicColors(true).
-        SetText("[green]i: chercher | n: suivant | espace: selectionner | tab: naviguer | ↑↓: scroll").
+        SetText("[green] t: tags management | m : merge management | espace: selectionner | tab: naviguer | ↑↓: scroll").
         SetTextAlign(tview.AlignLeft)
 
     // Grid Layout
@@ -321,11 +461,16 @@ func RunDevOpsUI(submodules []string, submoduleNames []string) {
                 }
                 updateSidebar()
                 return nil
-            case 'n':
+            case 't':
 				if len(selectedSubmodules) > 0 {
                     showSubmodulesTagsDetails(app, selectedSubmodules, grid, list)
                 }
                 return nil
+			case 'm':
+				if len(selectedSubmodules) > 0 {
+					showSubmoduleMergeDetails(app, selectedSubmodules, grid, list)
+				}
+				return nil			
             }
         } else if event.Key() == tcell.KeyTab {
             app.SetFocus(commitsView)
