@@ -15,7 +15,6 @@ import (
 )
 
 // RunS3BucketUI lance l'interface pour naviguer et sélectionner des fichiers dans un bucket S3
-// RunS3BucketUI lance l'interface pour naviguer et sélectionner des fichiers dans un bucket S3
 func RunS3BucketUI(s3Manager *S3Manager) {
 	app := tview.NewApplication()
 
@@ -57,24 +56,22 @@ func RunS3BucketUI(s3Manager *S3Manager) {
 
 	// En-tête
 	header := tview.NewTextView().
-		SetText("Aidalinfo devcli 🚀 - Navigateur de bucket S3").
+		SetText("Aidalinfo devcli 🚀 - Backup management").
 		SetTextAlign(tview.AlignCenter).
-		SetDynamicColors(true).
-		SetBorder(false)
+		SetDynamicColors(true)
 
 	// Pied de page
 	footer := tview.NewTextView().
 		SetDynamicColors(true).
 		SetText("[green]↑/↓ : Naviguer | Entrée : Sélectionner | Échap : Quitter").
-		SetTextAlign(tview.AlignCenter).
-		SetBorder(false)
+		SetTextAlign(tview.AlignCenter)
 
 	// Grille pour organiser l'interface
 	grid := tview.NewGrid().
 		SetRows(3, 0, 3).
-		SetColumns(90, 0).
-		SetBorders(false).
-		AddItem(header, 0, 0, 1, 2, 0, 0, false).
+		SetColumns(90, 70).
+		SetBorders(true).
+		AddItem(header, 0, 0, 1, 3, 0, 0, false).
 		AddItem(tree, 1, 0, 1, 1, 0, 0, true).
 		AddItem(selectedFilesList, 1, 1, 1, 1, 0, 0, false).
 		AddItem(footer, 2, 0, 1, 2, 0, 0, false)
