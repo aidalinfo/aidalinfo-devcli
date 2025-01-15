@@ -1,14 +1,14 @@
 package main
 
 import (
-	"sort"
 	"bufio"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
-    "regexp"
 	"os/exec"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
 )
 
 // listSubmodule : Récupère les sous-modules récursivement et retourne leurs chemins
@@ -63,22 +63,20 @@ func listSubmodule(path string) ([]string, error) {
 	return results, nil
 }
 
-
-func cleanSubmodule(submodules []string) ([]string, error)  {
+func cleanSubmodule(submodules []string) ([]string, error) {
 	re := regexp.MustCompile(`[^/]+$`)
 
-    // Extraire uniquement la dernière partie de chaque chemin
-    var submoduleNames []string
-    for _, submodule := range submodules {
-        // Utilise la regex pour trouver la partie après le dernier "/"
-        matches := re.FindStringSubmatch(submodule)
-        if len(matches) > 0 {
-            submoduleNames = append(submoduleNames, matches[0])
-        }
-    }
+	// Extraire uniquement la dernière partie de chaque chemin
+	var submoduleNames []string
+	for _, submodule := range submodules {
+		// Utilise la regex pour trouver la partie après le dernier "/"
+		matches := re.FindStringSubmatch(submodule)
+		if len(matches) > 0 {
+			submoduleNames = append(submoduleNames, matches[0])
+		}
+	}
 	return submoduleNames, nil
 }
-
 
 // Fonction pour exécuter "git status" dans un sous-module
 func gitStatus(submodule string) string {
@@ -89,7 +87,6 @@ func gitStatus(submodule string) string {
 	}
 	return string(output)
 }
-
 
 // Fonction pour obtenir la branche actuelle du sous-module
 func getCurrentBranch(path string) string {
@@ -120,7 +117,6 @@ func getBranches(path string) []string {
 	return branches
 }
 
-
 // Fonction pour effectuer un merge
 func createMerge(currentBranch, targetBranch, repoPath string) error {
 	cmd := exec.Command("git", "-C", repoPath, "merge", "--no-ff", targetBranch)
@@ -136,7 +132,6 @@ func createMerge(currentBranch, targetBranch, repoPath string) error {
 	}
 	return nil
 }
-
 
 func getDiffSummary(currentBranch, targetBranch, repoPath string) (string, error) {
 	cmd := exec.Command("git", "-C", repoPath, "diff", "--shortstat", currentBranch+".."+targetBranch)
@@ -161,96 +156,93 @@ func pushChanges(currentBranch, repoPath string) error {
 	return nil
 }
 
-
 type Commit struct {
-    Date      string
-    Author    string
-    Message   string
-    Submodule string
+	Date      string
+	Author    string
+	Message   string
+	Submodule string
 }
 
 func getLastCommits(submodules []string) ([]Commit, error) {
-    var allCommits []Commit
-    
-    for _, submodule := range submodules {
-        // On garde le hash dans le format uniquement pour le tri, mais on ne le stocke pas
-        cmd := exec.Command("git", "-C", submodule, "log", "-n", "3", "--pretty=format:%ai|%an|%s")
-        output, err := cmd.CombinedOutput()
-        if err != nil {
-            continue
-        }
+	var allCommits []Commit
 
-        commits := strings.Split(strings.TrimSpace(string(output)), "\n")
-        for _, commit := range commits {
-            if commit == "" {
-                continue
-            }
-            parts := strings.Split(commit, "|")
-            if len(parts) == 3 {
-                allCommits = append(allCommits, Commit{
-                    Date:      parts[0],
-                    Author:    parts[1],
-                    Message:   parts[2],
-                    Submodule: filepath.Base(submodule),
-                })
-            }
-        }
-    }
+	for _, submodule := range submodules {
+		// On garde le hash dans le format uniquement pour le tri, mais on ne le stocke pas
+		cmd := exec.Command("git", "-C", submodule, "log", "--all", "-n", "3", "--pretty=format:%ai|%an|%s")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			continue
+		}
 
-    // Trier les commits par date (du plus récent au plus ancien)
-    sort.Slice(allCommits, func(i, j int) bool {
-        return allCommits[i].Date > allCommits[j].Date
-    })
+		commits := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, commit := range commits {
+			if commit == "" {
+				continue
+			}
+			parts := strings.Split(commit, "|")
+			if len(parts) == 3 {
+				allCommits = append(allCommits, Commit{
+					Date:      parts[0],
+					Author:    parts[1],
+					Message:   parts[2],
+					Submodule: filepath.Base(submodule),
+				})
+			}
+		}
+	}
 
-    // Retourner les 20 commits les plus récents
-    if len(allCommits) > 20 {
-        return allCommits[:20], nil
-    }
-    return allCommits, nil
+	// Trier les commits par date (du plus récent au plus ancien)
+	sort.Slice(allCommits, func(i, j int) bool {
+		return allCommits[i].Date > allCommits[j].Date
+	})
+
+	// Retourner les 20 commits les plus récents
+	if len(allCommits) > 20 {
+		return allCommits[:20], nil
+	}
+	return allCommits, nil
 }
-
 
 // Fonction pour récupérer la branche par défaut de GitHub
 func getDefaultBranch() (string, error) {
-    cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
-    output, err := cmd.Output()
-    if err != nil {
-        return "", fmt.Errorf("impossible de déterminer la branche par défaut : %v", err)
-    }
+	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("impossible de déterminer la branche par défaut : %v", err)
+	}
 
-    // Extraire la branche par défaut du chemin
-    defaultBranch := strings.TrimSpace(strings.TrimPrefix(string(output), "refs/remotes/origin/"))
-    fmt.Printf(" 👉 Branche par défaut détectée : %s\n", defaultBranch)
-    return defaultBranch, nil
+	// Extraire la branche par défaut du chemin
+	defaultBranch := strings.TrimSpace(strings.TrimPrefix(string(output), "refs/remotes/origin/"))
+	fmt.Printf(" 👉 Branche par défaut détectée : %s\n", defaultBranch)
+	return defaultBranch, nil
 }
 
-
-//Fonction qui récupère d'un repos
+// Fonction qui récupère d'un repos
 func getLastTags(repoPath string) ([]string, []string, error) {
-    // Obtenir tous les tags triés par date
-    cmd := exec.Command("git", "-C", repoPath, "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)", "refs/tags/")
-    output, err := cmd.Output()
-    if err != nil {
-        return nil, nil, fmt.Errorf("Erreur lors de la récupération des tags : %s\n%s", err.Error(), string(output))
-    }
+	// Obtenir tous les tags triés par date
+	cmd := exec.Command("git", "-C", repoPath, "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)", "refs/tags/")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, nil, fmt.Errorf("Erreur lors de la récupération des tags : %s\n%s", err.Error(), string(output))
+	}
 
-    // Séparer les tags en `v*` et `rc-*`
-    tags := strings.Split(string(output), "\n")
-    var vTags []string
-    var rcTags []string
+	// Séparer les tags en `v*` et `rc-*`
+	tags := strings.Split(string(output), "\n")
+	var vTags []string
+	var rcTags []string
 
-    for _, tag := range tags {
-        if strings.HasPrefix(tag, "v") {
-            vTags = append(vTags, tag)
-        } else if strings.HasPrefix(tag, "rc-") {
-            rcTags = append(rcTags, tag)
-        }
-    }
+	for _, tag := range tags {
+		if strings.HasPrefix(tag, "v") {
+			vTags = append(vTags, tag)
+		} else if strings.HasPrefix(tag, "rc-") {
+			rcTags = append(rcTags, tag)
+		}
+	}
 
-    return vTags, rcTags, nil
+	return vTags, rcTags, nil
 }
 
-//Creation d'un tag
+// Creation d'un tag
 func createTag(repoPath, version, message string) error {
 	cmd := exec.Command("git", "-C", repoPath, "tag", "-a", version, "-m", message)
 	output, err := cmd.CombinedOutput()
