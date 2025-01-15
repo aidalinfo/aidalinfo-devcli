@@ -12,6 +12,8 @@ import (
 var VERSION = "0.0.6"
 
 func main() {
+
+	listTest()
 	projectPath := flag.String("path", ".", "Chemin du projet")
 	uiMode := flag.Bool("ui", false, "Lancer l'interface utilisateur")
 	version := flag.Bool("version", false, "Afficher la version")
