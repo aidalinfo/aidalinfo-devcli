@@ -11,6 +11,18 @@ wget https://github.com/aidalinfo/aidalinfo-devcli/releases/latest/download/aida
 chmod +x aidalinfo-cli
 sudo mv aidalinfo-cli /usr/local/bin/
 ```
+Ensuite il faut redémarrer son terminal ou :
+
+Pour bash :
+```bash
+source ~/.bashrc
+```
+
+Pour ZSH : 
+
+```bash
+source ~/.zshrc
+```
 
 ### MacOS
 
