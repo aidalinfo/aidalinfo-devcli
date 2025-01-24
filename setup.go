@@ -181,3 +181,41 @@ func execCommand(name string, args ...string) error {
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
+
+func npmUpdateAction() error {
+	currentDir, err := os.Getwd()
+	if err != nil {
+			return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
+	}
+
+	entries, err := os.ReadDir(".")
+	if err != nil {
+			return fmt.Errorf("erreur lors de la lecture du répertoire: %v", err)
+	}
+
+	for _, entry := range entries {
+			// Vérifier si c'est un dossier
+			if !entry.IsDir() {
+					continue
+			}
+
+			// Vérifier si package.json existe dans le dossier
+			packagePath := fmt.Sprintf("%s/%s/package.json", currentDir, entry.Name())
+			if _, err := os.Stat(packagePath); err == nil {
+					fmt.Printf("📦 Mise à jour npm dans %s\n", entry.Name())
+					if err := os.Chdir(entry.Name()); err != nil {
+							return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
+					}
+
+					if err := execCommand("npm", "update"); err != nil {
+							return err
+					}
+
+					if err := os.Chdir(currentDir); err != nil {
+							return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
+					}
+			}
+	}
+
+	return nil
+}

@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var VERSION = "0.0.6"
+var VERSION = "0.0.7"
 
 func main() {
 	projectPath := flag.String("path", ".", "Chemin du projet")
@@ -22,6 +22,7 @@ func main() {
 	npmCmd := flag.Bool("npm", false, "Installer les dépendances npm")
 	fullCmd := flag.Bool("full", false, "Installation complète (submodules + npm)")
 	devopsCmd := flag.Bool("ui-devops", false, "Lancer l'interface DevOps")
+	updateNpmCmd := flag.Bool("update-npm", false, "Mettre à jour les dépendances npm")
 	flag.Parse()
 
 	if err := checkForUpdates(VERSION); err != nil {
@@ -91,6 +92,11 @@ func main() {
 			return
 		}
 		RunDevOpsUI(submodules, submoduleNames)
+	} else if *updateNpmCmd {
+		if err := npmUpdateAction(); err != nil {
+			fmt.Printf("Erreur: %v\n", err)
+			os.Exit(1)
+		}
 	} else {
 		fmt.Println("Usage:")
 		fmt.Println("  -ui              Lancer l'interface utilisateur")
@@ -99,6 +105,7 @@ func main() {
 		fmt.Println("  -install         Installer les submodules")
 		fmt.Println("  -branch=\"X Y\"    Spécifier la ou les branches (X avec fallback sur Y)")
 		fmt.Println("  -npm             Installer les dépendances npm")
+		fmt.Println("  -update-npm       Mettre à jour les dépendances npm des submodules")
 		fmt.Println("  -full            Installation complète (submodules + npm)")
 		fmt.Println("  -version, -v     Afficher la version")
 	}
