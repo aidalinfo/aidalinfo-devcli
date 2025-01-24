@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var VERSION = "0.0.7"
+var VERSION = "0.0.8"
 
 func main() {
 	projectPath := flag.String("path", ".", "Chemin du projet")
@@ -23,6 +23,7 @@ func main() {
 	fullCmd := flag.Bool("full", false, "Installation complète (submodules + npm)")
 	devopsCmd := flag.Bool("ui-devops", false, "Lancer l'interface DevOps")
 	updateNpmCmd := flag.Bool("update-npm", false, "Mettre à jour les dépendances npm")
+	updateGitCmd := flag.Bool("update-git", false, "Mettre à jour les sous-modules (git pull)")
 	flag.Parse()
 
 	if err := checkForUpdates(VERSION); err != nil {
@@ -97,6 +98,17 @@ func main() {
 			fmt.Printf("Erreur: %v\n", err)
 			os.Exit(1)
 		}
+	} else if *updateGitCmd {
+		submodules, err := listSubmodule(*projectPath)
+		if err != nil {
+			fmt.Println("Erreur :", err)
+			return
+		}
+		if err := gitUpdateAction(submodules); err != nil {
+			fmt.Printf("Erreur: %v\n", err)
+			os.Exit(1)
+		}
+
 	} else {
 		fmt.Println("Usage:")
 		fmt.Println("  -ui              Lancer l'interface utilisateur")
@@ -106,6 +118,7 @@ func main() {
 		fmt.Println("  -branch=\"X Y\"    Spécifier la ou les branches (X avec fallback sur Y)")
 		fmt.Println("  -npm             Installer les dépendances npm")
 		fmt.Println("  -update-npm       Mettre à jour les dépendances npm des submodules")
+		fmt.Println("  -update-git       Mettre à jour les sous-modules (git pull)")
 		fmt.Println("  -full            Installation complète (submodules + npm)")
 		fmt.Println("  -version, -v     Afficher la version")
 	}

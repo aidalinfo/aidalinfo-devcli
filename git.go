@@ -275,3 +275,27 @@ func changeBranche(repoPath, branch string) error {
 	}
 	return nil
 }
+
+func gitUpdateAction(submodules []string) error {
+	currentDir, err := os.Getwd()
+	if err != nil {
+			return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
+	}
+
+	for _, submodule := range submodules {
+			fmt.Printf("📦 Mise à jour git dans %s\n", submodule)
+			if err := os.Chdir(submodule); err != nil {
+					return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
+			}
+
+			if err := execCommand("git", "pull"); err != nil {
+					return err
+			}
+
+			if err := os.Chdir(currentDir); err != nil {
+					return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
+			}
+	}
+
+	return nil
+}
