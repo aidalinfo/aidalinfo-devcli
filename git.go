@@ -119,6 +119,12 @@ func getBranches(path string) []string {
 
 // Fonction pour effectuer un merge
 func createMerge(currentBranch, targetBranch, repoPath string) error {
+	// Récupérer les dernières modifications de la targetBranch sans changer de branche
+	fetchCmd := exec.Command("git", "-C", repoPath, "fetch", "origin", targetBranch)
+	fetchOutput, fetchErr := fetchCmd.CombinedOutput()
+	if fetchErr != nil {
+		return fmt.Errorf("Erreur lors du fetch : %s\n%s", fetchErr.Error(), string(fetchOutput))
+	}	
 	cmd := exec.Command("git", "-C", repoPath, "merge", "--no-ff", targetBranch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -156,19 +162,42 @@ func pushChanges(currentBranch, repoPath string) error {
 	return nil
 }
 
+func extractBranchName(decor string) string {
+	// Supprime les parenthèses de début et de fin s'il y en a.
+	decor = strings.Trim(decor, "()")
+	
+	// Découpe la chaîne sur la virgule (car Git sépare les références par une virgule).
+	parts := strings.Split(decor, ",")
+	for _, part := range parts {
+			part = strings.TrimSpace(part)
+			// Si la partie commence par "HEAD ->", on en extrait le nom.
+			if strings.HasPrefix(part, "HEAD ->") {
+					return strings.TrimSpace(strings.TrimPrefix(part, "HEAD ->"))
+			}
+	}
+	// Optionnel : Si aucun "HEAD ->" n'est trouvé, retourner la première référence nettoyée
+	if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+	}
+	return ""
+}
+
+
 type Commit struct {
 	Date      string
 	Author    string
 	Message   string
 	Submodule string
+	Branch string
 }
+
 
 func getLastCommits(submodules []string) ([]Commit, error) {
 	var allCommits []Commit
 
 	for _, submodule := range submodules {
 		// On garde le hash dans le format uniquement pour le tri, mais on ne le stocke pas
-		cmd := exec.Command("git", "-C", submodule, "log", "--all", "-n", "3", "--pretty=format:%ai|%an|%s")
+		cmd := exec.Command("git", "-C", submodule, "log", "--all", "-n", "3", "--pretty=format:%ai|%an|%s|%d")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			continue
@@ -180,12 +209,13 @@ func getLastCommits(submodules []string) ([]Commit, error) {
 				continue
 			}
 			parts := strings.Split(commit, "|")
-			if len(parts) == 3 {
+			if len(parts) == 4 {
 				allCommits = append(allCommits, Commit{
 					Date:      parts[0],
 					Author:    parts[1],
 					Message:   parts[2],
 					Submodule: filepath.Base(submodule),
+					Branch: parts[3],
 				})
 			}
 		}

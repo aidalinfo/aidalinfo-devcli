@@ -168,11 +168,13 @@ func RunUI(submodules []string, submoduleNames []string) {
 		content += fmt.Sprintf(
 			"[yellow]%s[white]\n"+
 				"[blue]%s[white] - %s\n"+
+				"[magenta]%s[white]\n"+
 				"%s\n"+
 				"-------------------\n",
 			commit.Submodule,
 			commit.Date[:16],
 			commit.Author,
+			commit.Branch,
 			commit.Message,
 		)
 	}

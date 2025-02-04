@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var VERSION = "0.0.8"
+var VERSION = "0.0.9"
 
 func main() {
 	projectPath := flag.String("path", ".", "Chemin du projet")
