@@ -1,4 +1,4 @@
-package main
+package backend
 
 import (
 	"bufio"
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func submoduleAction(branches ...string) error {
+func SubmoduleAction(branches ...string) error {
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
@@ -24,7 +24,7 @@ func submoduleAction(branches ...string) error {
 	}
 
 	// Ajouter la branche par défaut à la liste des branches à tenter
-	defaultBranch, err := getDefaultBranch()
+	defaultBranch, err := GetDefaultBranch()
 	if err != nil {
 		return fmt.Errorf("erreur lors de la récupération de la branche par défaut : %v", err)
 	}
@@ -93,7 +93,7 @@ func submoduleAction(branches ...string) error {
 		if _, err := os.Stat(".gitmodules"); err == nil {
 			fmt.Println(" 👉👉 Il y a un fichier .gitmodules")
 			fmt.Println(" 🤖🤖 RECURSIVITE !")
-			if err := submoduleAction(branches...); err != nil {
+			if err := SubmoduleAction(branches...); err != nil {
 				return err
 			}
 		}
@@ -107,7 +107,7 @@ func submoduleAction(branches ...string) error {
 	return nil
 }
 
-func npmAction(all bool) error {
+func NpmAction(all bool) error {
 	if !all {
 		return nil
 	}
@@ -141,7 +141,7 @@ func npmAction(all bool) error {
 	return nil
 }
 
-func tagAction(version, message string) error {
+func TagAction(version, message string) error {
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		return fmt.Errorf("erreur lors de la lecture du répertoire: %v", err)
@@ -182,7 +182,7 @@ func execCommand(name string, args ...string) error {
 	return cmd.Run()
 }
 
-func npmUpdateAction() error {
+func NpmUpdateAction() error {
 	currentDir, err := os.Getwd()
 	if err != nil {
 			return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)

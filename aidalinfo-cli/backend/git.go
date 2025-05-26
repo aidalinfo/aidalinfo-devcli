@@ -1,4 +1,4 @@
-package main
+package backend
 
 import (
 	"bufio"
@@ -11,8 +11,8 @@ import (
 	"strings"
 )
 
-// listSubmodule : Récupère les sous-modules récursivement et retourne leurs chemins
-func listSubmodule(path string) ([]string, error) {
+// ListSubmodule : Récupère les sous-modules récursivement et retourne leurs chemins
+func ListSubmodule(path string) ([]string, error) {
 	var results []string
 
 	// Si le chemin est vide, utilise le répertoire courant
@@ -48,7 +48,7 @@ func listSubmodule(path string) ([]string, error) {
 			results = append(results, fullPath)
 
 			// Vérifie les sous-modules imbriqués récursivement
-			subResults, err := listSubmodule(fullPath)
+			subResults, err := ListSubmodule(fullPath)
 			if err == nil {
 				results = append(results, subResults...)
 			}
@@ -63,23 +63,27 @@ func listSubmodule(path string) ([]string, error) {
 	return results, nil
 }
 
-func cleanSubmodule(submodules []string) ([]string, error) {
-	re := regexp.MustCompile(`[^/]+$`)
+func CleanSubmodule(submodules []string) ([]string, error) {
+	// Regex pour extraire la dernière partie après / ou \
+	re := regexp.MustCompile(`[^/\\]+$`)
 
 	// Extraire uniquement la dernière partie de chaque chemin
 	var submoduleNames []string
 	for _, submodule := range submodules {
-		// Utilise la regex pour trouver la partie après le dernier "/"
+		// Utilise la regex pour trouver la partie après le dernier "/" ou "\"
 		matches := re.FindStringSubmatch(submodule)
 		if len(matches) > 0 {
 			submoduleNames = append(submoduleNames, matches[0])
+		} else {
+			// Fallback: si la regex ne fonctionne pas, utiliser filepath.Base
+			submoduleNames = append(submoduleNames, filepath.Base(submodule))
 		}
 	}
 	return submoduleNames, nil
 }
 
 // Fonction pour exécuter "git status" dans un sous-module
-func gitStatus(submodule string) string {
+func GitStatus(submodule string) string {
 	cmd := exec.Command("git", "-C", submodule, "status")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -89,7 +93,7 @@ func gitStatus(submodule string) string {
 }
 
 // Fonction pour obtenir la branche actuelle du sous-module
-func getCurrentBranch(path string) string {
+func GetCurrentBranch(path string) string {
 	cmd := exec.Command("git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -99,7 +103,7 @@ func getCurrentBranch(path string) string {
 }
 
 // Fonction pour obtenir la liste des branches disponibles
-func getBranches(path string) []string {
+func GetBranches(path string) []string {
 	// Effectuer un git fetch pour récupérer les branches distantes
 	fetchCmd := exec.Command("git", "-C", path, "fetch", "--all", "--prune")
 	if err := fetchCmd.Run(); err != nil {
@@ -192,7 +196,7 @@ type Commit struct {
 }
 
 
-func getLastCommits(submodules []string) ([]Commit, error) {
+func GetLastCommits(submodules []string) ([]Commit, error) {
 	var allCommits []Commit
 
 	for _, submodule := range submodules {
@@ -234,7 +238,7 @@ func getLastCommits(submodules []string) ([]Commit, error) {
 }
 
 // Fonction pour récupérer la branche par défaut de GitHub
-func getDefaultBranch() (string, error) {
+func GetDefaultBranch() (string, error) {
 	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
 	output, err := cmd.Output()
 	if err != nil {
@@ -248,7 +252,7 @@ func getDefaultBranch() (string, error) {
 }
 
 // Fonction qui récupère d'un repos
-func getLastTags(repoPath string) ([]string, []string, error) {
+func GetLastTags(repoPath string) ([]string, []string, error) {
 	// Obtenir tous les tags triés par date
 	cmd := exec.Command("git", "-C", repoPath, "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)", "refs/tags/")
 	output, err := cmd.Output()
@@ -273,7 +277,7 @@ func getLastTags(repoPath string) ([]string, []string, error) {
 }
 
 // Creation d'un tag
-func createTag(repoPath, version, message string) error {
+func CreateTag(repoPath, version, message string) error {
 	cmd := exec.Command("git", "-C", repoPath, "tag", "-a", version, "-m", message)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -306,7 +310,7 @@ func changeBranche(repoPath, branch string) error {
 	return nil
 }
 
-func gitUpdateAction(submodules []string) error {
+func GitUpdateAction(submodules []string) error {
 	currentDir, err := os.Getwd()
 	if err != nil {
 			return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
