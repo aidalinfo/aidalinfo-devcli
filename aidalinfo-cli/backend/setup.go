@@ -5,15 +5,24 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
-func SubmoduleAction(branches ...string) error {
-	currentDir, err := os.Getwd()
+// SubmoduleAction effectue le checkout des submodules dans le chemin donné
+func SubmoduleAction(path string, branches ...string) error {
+	initialDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
 	}
-	fmt.Printf(" 👉 On est dans le répertoire %s\n", currentDir)
+	if path != "" && path != "." {
+		if err := os.Chdir(path); err != nil {
+			return fmt.Errorf("erreur lors du changement de répertoire vers %s: %v", path, err)
+		}
+	}
+	defer os.Chdir(initialDir)
+
+	fmt.Printf(" 👉 On est dans le répertoire %s\n", path)
 
 	fmt.Println(" 🤖 On initialise et update les submodules")
 	if err := execCommand("git", "submodule", "init"); err != nil {
@@ -68,11 +77,12 @@ func SubmoduleAction(branches ...string) error {
 	fmt.Printf(" 👉 On a trouvé les submodules suivants : %v\n", submodules)
 
 	for _, submodule := range submodules {
-		fmt.Printf(" 👉👉 On est dans %s et on a trouvé le submodule: %s\n", currentDir, submodule)
-		fmt.Printf(" 🤖 On va dans le répertoire %s\n", submodule)
+		fmt.Printf(" 👉👉 On est dans %s et on a trouvé le submodule: %s\n", path, submodule)
+		absSubmodulePath := filepath.Join(path, submodule)
+		fmt.Printf(" 🤖 On va dans le répertoire %s\n", absSubmodulePath)
 
-		if err := os.Chdir(submodule); err != nil {
-			return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
+		if err := os.Chdir(absSubmodulePath); err != nil {
+			return fmt.Errorf("erreur lors du changement de répertoire: chdir %s: %v", absSubmodulePath, err)
 		}
 
 		for _, branch := range branches {
@@ -93,13 +103,12 @@ func SubmoduleAction(branches ...string) error {
 		if _, err := os.Stat(".gitmodules"); err == nil {
 			fmt.Println(" 👉👉 Il y a un fichier .gitmodules")
 			fmt.Println(" 🤖🤖 RECURSIVITE !")
-			if err := SubmoduleAction(branches...); err != nil {
+			if err := SubmoduleAction(absSubmodulePath, branches...); err != nil {
 				return err
 			}
 		}
 
-		fmt.Printf(" 🤖 On retourne dans le répertoire %s\n", currentDir)
-		if err := os.Chdir(currentDir); err != nil {
+		if err := os.Chdir(initialDir); err != nil {
 			return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
 		}
 	}

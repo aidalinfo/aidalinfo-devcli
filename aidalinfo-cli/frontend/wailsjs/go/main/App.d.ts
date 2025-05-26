@@ -14,7 +14,7 @@ export function GetDefaultBranch():Promise<string>;
 
 export function GetLastCommits(arg1:Array<string>):Promise<Array<backend.Commit>>;
 
-export function GetLastTags(arg1:string):Promise<Array<string>>;
+export function GetLastTags(arg1:string):Promise<backend.TagsResult>;
 
 export function GitStatus(arg1:string):Promise<string>;
 
@@ -22,7 +22,7 @@ export function Greet(arg1:string):Promise<string>;
 
 export function InstallNpmDependencies(arg1:boolean):Promise<void>;
 
-export function InstallSubmodules(arg1:Array<string>):Promise<void>;
+export function InstallSubmodules(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function ListSubmodules(arg1:string):Promise<Array<string>>;
 

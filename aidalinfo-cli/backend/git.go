@@ -254,6 +254,7 @@ func GetDefaultBranch() (string, error) {
 // Fonction qui récupère d'un repos
 func GetLastTags(repoPath string) ([]string, []string, error) {
 	// Obtenir tous les tags triés par date
+	println("Récupération des tags...")
 	cmd := exec.Command("git", "-C", repoPath, "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)", "refs/tags/")
 	output, err := cmd.Output()
 	if err != nil {
@@ -272,7 +273,12 @@ func GetLastTags(repoPath string) ([]string, []string, error) {
 			rcTags = append(rcTags, tag)
 		}
 	}
-
+	print("Tags récupérés avec succès.\n")
+	println("Nombre de tags v* :", len(vTags))
+	println("Nombre de tags rc-* :", len(rcTags))
+	//liste les tags
+	fmt.Println("Liste des tags v* :", strings.Join(vTags, ", "))
+	fmt.Println("Liste des tags rc-* :", strings.Join(rcTags, ", "))	
 	return vTags, rcTags, nil
 }
 
@@ -332,4 +338,9 @@ func GitUpdateAction(submodules []string) error {
 	}
 
 	return nil
+}
+
+type TagsResult struct {
+	VTags  []string `json:"vTags"`
+	RcTags []string `json:"rcTags"`
 }

@@ -49,7 +49,7 @@
                 <div
                   v-for="tag in relevantTags"
                   :key="tag"
-                  class="px-2 py-1 text-sm bg-secondary rounded text-secondary-foreground"
+                  class="px-2 py-1 text-sm rounded text-secondary-foreground"
                 >
                   {{ tag }}
                 </div>
@@ -79,7 +79,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { GetLastTags, CreateTag } from '../../wailsjs/go/main/App'
 import { toast } from 'vue-sonner'
-
 interface Props {
   open: boolean
   submodulePath: string
@@ -111,22 +110,25 @@ const suggestedVersion = computed(() => {
     const lastRcTag = rcTags.value[0]
     if (lastRcTag) {
       // Extraire le numéro de version et l'incrémenter
-      const match = lastRcTag.match(/rc-(\d+)\.(\d+)\.(\d+)/)
+      const match = lastRcTag.match(/rc-v(\d+)\.(\d+)\.(\d+)\.(\d+)/)
       if (match) {
-        const [, major, minor, patch] = match
-        return `rc-${major}.${minor}.${parseInt(patch) + 1}`
+        const [, major, minor, patch, build] = match
+        return `rc-v${major}.${minor}.${patch}.${parseInt(build) + 1}`
       }
     }
     return 'rc-1.0.0'
   } else {
-    // Pour prod, suggérer vX.X.X
+    // Pour prod, suggérer vX.X.XXXX (padding conservé)
     const lastVTag = vTags.value[0]
     if (lastVTag) {
-      // Extraire le numéro de version et l'incrémenter
+      // Match v1.1.0039 ou v1.1.39 etc.
       const match = lastVTag.match(/v(\d+)\.(\d+)\.(\d+)/)
       if (match) {
         const [, major, minor, patch] = match
-        return `v${major}.${minor}.${parseInt(patch) + 1}`
+        // Conserver le padding du patch
+        const patchLen = patch.length
+        const nextPatch = (parseInt(patch, 10) + 1).toString().padStart(patchLen, '0')
+        return `v${major}.${minor}.${nextPatch}`
       }
     }
     return 'v1.0.0'
@@ -138,9 +140,9 @@ const loadTags = async () => {
   
   loading.value = true
   try {
-    const [v, rc] = await GetLastTags(props.submodulePath)
-    vTags.value = v || []
-    rcTags.value = rc || []
+    const tagsResult = await GetLastTags(props.submodulePath)
+    vTags.value = Array.isArray(tagsResult.vTags) ? tagsResult.vTags : []
+    rcTags.value = Array.isArray(tagsResult.rcTags) ? tagsResult.rcTags : []
   } catch (error) {
     console.error('Erreur lors du chargement des tags:', error)
     toast.error("Impossible de charger l'historique des tags")
@@ -180,17 +182,27 @@ const createTag = async () => {
 // Charger les tags quand le dialog s'ouvre
 watch(() => props.open, (newOpen) => {
   if (newOpen) {
-    loadTags()
-    // Pré-remplir la version suggérée
-    version.value = suggestedVersion.value
+    loadTags().then(() => {
+      // Mettre le dernier tag comme valeur par défaut dans l'input
+      if (props.tagType === 'rc') {
+        version.value = rcTags.value[0] || ''
+      } else {
+        version.value = vTags.value[0] || ''
+      }
+    })
   }
 })
 
 // Initialiser au montage si le dialog est déjà ouvert
 onMounted(() => {
   if (props.open) {
-    loadTags()
-    version.value = suggestedVersion.value
+    loadTags().then(() => {
+      if (props.tagType === 'rc') {
+        version.value = rcTags.value[0] || ''
+      } else {
+        version.value = vTags.value[0] || ''
+      }
+    })
   }
 })
 </script>

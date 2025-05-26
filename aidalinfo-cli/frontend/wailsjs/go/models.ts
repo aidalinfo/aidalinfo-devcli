@@ -20,6 +20,20 @@ export namespace backend {
 	        this.Branch = source["Branch"];
 	    }
 	}
+	export class TagsResult {
+	    vTags: string[];
+	    rcTags: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TagsResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.vTags = source["vTags"];
+	        this.rcTags = source["rcTags"];
+	    }
+	}
 
 }
 

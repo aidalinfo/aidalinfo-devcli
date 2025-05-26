@@ -1,9 +1,9 @@
 package main
 
 import (
+	"aidalinfo-cli/backend"
 	"context"
 	"fmt"
-	"aidalinfo-cli/backend"
 )
 
 // App struct
@@ -53,8 +53,8 @@ func (a *App) GetLastCommits(submodules []string) ([]backend.Commit, error) {
 }
 
 // Backend Setup operations
-func (a *App) InstallSubmodules(branches ...string) error {
-	return backend.SubmoduleAction(branches...)
+func (a *App) InstallSubmodules(path string, branches []string) error {
+	return backend.SubmoduleAction(path, branches...)
 }
 
 func (a *App) InstallNpmDependencies(all bool) error {
@@ -74,10 +74,10 @@ func (a *App) CreateTag(repoPath, version, message string) error {
 	return backend.CreateTag(repoPath, version, message)
 }
 
-func (a *App) GetLastTags(repoPath string) ([]string, []string, error) {
-	return backend.GetLastTags(repoPath)
+func (a *App) GetLastTags(repoPath string) (backend.TagsResult, error) {
+	vTags, rcTags, err := backend.GetLastTags(repoPath)
+	return backend.TagsResult{VTags: vTags, RcTags: rcTags}, err
 }
-
 func (a *App) TagAction(version, message string) error {
 	return backend.TagAction(version, message)
 }

@@ -42,8 +42,8 @@ export function InstallNpmDependencies(arg1) {
   return window['go']['main']['App']['InstallNpmDependencies'](arg1);
 }
 
-export function InstallSubmodules(arg1) {
-  return window['go']['main']['App']['InstallSubmodules'](arg1);
+export function InstallSubmodules(arg1, arg2) {
+  return window['go']['main']['App']['InstallSubmodules'](arg1, arg2);
 }
 
 export function ListSubmodules(arg1) {
