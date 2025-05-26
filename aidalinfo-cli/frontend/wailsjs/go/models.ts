@@ -20,6 +20,20 @@ export namespace backend {
 	        this.Branch = source["Branch"];
 	    }
 	}
+	export class S3Credentials {
+	    accessKey: string;
+	    secretKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new S3Credentials(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accessKey = source["accessKey"];
+	        this.secretKey = source["secretKey"];
+	    }
+	}
 	export class TagsResult {
 	    vTags: string[];
 	    rcTags: string[];

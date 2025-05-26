@@ -6,6 +6,8 @@ export function CleanSubmodules(arg1:Array<string>):Promise<Array<string>>;
 
 export function CreateTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function DownloadBackupWithCreds(arg1:backend.S3Credentials,arg2:string,arg3:string):Promise<void>;
+
 export function GetBranches(arg1:string):Promise<Array<string>>;
 
 export function GetCurrentBranch(arg1:string):Promise<string>;
@@ -23,6 +25,8 @@ export function Greet(arg1:string):Promise<string>;
 export function InstallNpmDependencies(arg1:boolean):Promise<void>;
 
 export function InstallSubmodules(arg1:string,arg2:Array<string>):Promise<void>;
+
+export function ListBackupsWithCreds(arg1:backend.S3Credentials,arg2:string):Promise<Array<string>>;
 
 export function ListSubmodules(arg1:string):Promise<Array<string>>;
 

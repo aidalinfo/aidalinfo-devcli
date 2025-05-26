@@ -10,6 +10,10 @@ export function CreateTag(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateTag'](arg1, arg2, arg3);
 }
 
+export function DownloadBackupWithCreds(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DownloadBackupWithCreds'](arg1, arg2, arg3);
+}
+
 export function GetBranches(arg1) {
   return window['go']['main']['App']['GetBranches'](arg1);
 }
@@ -44,6 +48,10 @@ export function InstallNpmDependencies(arg1) {
 
 export function InstallSubmodules(arg1, arg2) {
   return window['go']['main']['App']['InstallSubmodules'](arg1, arg2);
+}
+
+export function ListBackupsWithCreds(arg1, arg2) {
+  return window['go']['main']['App']['ListBackupsWithCreds'](arg1, arg2);
 }
 
 export function ListSubmodules(arg1) {

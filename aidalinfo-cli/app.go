@@ -4,6 +4,8 @@ import (
 	"aidalinfo-cli/backend"
 	"context"
 	"fmt"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -20,6 +22,8 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// Force la fenêtre à se maximiser sur l'écran courant au démarrage
+	runtime.WindowMaximise(ctx)
 }
 
 // Greet returns a greeting for the given name
@@ -84,4 +88,14 @@ func (a *App) TagAction(version, message string) error {
 
 func (a *App) NpmUpdateAction() error {
 	return backend.NpmUpdateAction()
+}
+
+// Expose DownloadBackupWithCreds to frontend
+func (a *App) DownloadBackupWithCreds(creds backend.S3Credentials, s3Path, destPath string) error {
+	return backend.DownloadBackupWithCreds(a.ctx, creds, s3Path, destPath)
+}
+
+// Expose ListBackupsWithCreds to frontend
+func (a *App) ListBackupsWithCreds(creds backend.S3Credentials, s3Dir string) ([]string, error) {
+	return backend.ListBackupsWithCreds(a.ctx, creds, s3Dir)
 }
