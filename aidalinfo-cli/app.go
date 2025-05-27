@@ -22,6 +22,9 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	backend.AppCtxForLogToFrontend = ctx // Permet à LogToFrontend d'envoyer les logs au frontend
+	// Exemple d'utilisation
+	backend.LogToFrontend("info", "[Wails] Application démarrée.")
 	// Force la fenêtre à se maximiser sur l'écran courant au démarrage
 	runtime.WindowMaximise(ctx)
 }
@@ -95,7 +98,19 @@ func (a *App) DownloadBackupWithCreds(creds backend.S3Credentials, s3Path, destP
 	return backend.DownloadBackupWithCreds(a.ctx, creds, s3Path, destPath)
 }
 
-// Expose ListBackupsWithCreds to frontend
-func (a *App) ListBackupsWithCreds(creds backend.S3Credentials, s3Dir string) ([]string, error) {
+// Expose BackupInfo to frontend
+func (a *App) ListBackupsWithCreds(creds backend.S3Credentials, s3Dir string) ([]backend.BackupInfo, error) {
 	return backend.ListBackupsWithCreds(a.ctx, creds, s3Dir)
+}
+
+// Expose RestoreMongoBackup to frontend
+func (a *App) RestoreMongoBackup(creds backend.S3Credentials, s3Path, mongoHost, mongoPort, mongoUser, mongoPassword string) error {
+	return backend.RestoreMongoBackup(a.ctx, creds, s3Path, mongoHost, mongoPort, mongoUser, mongoPassword)
+}
+
+// Expose RestoreS3Backup to frontend
+// wailsjs/go/main/App.d.ts doit être régénéré pour :
+// export function RestoreS3Backup(cloudCreds: backend.S3Credentials, localCreds: backend.S3Credentials, s3Path: string, s3Host: string, s3Port: string, s3Region: string): Promise<void>;
+func (a *App) RestoreS3Backup(cloudCreds backend.S3Credentials, localCreds backend.S3Credentials, s3Path, s3Host, s3Port, s3Region string) error {
+	return backend.RestoreS3Backup(a.ctx, cloudCreds, localCreds, s3Path, s3Host, s3Port, s3Region)
 }

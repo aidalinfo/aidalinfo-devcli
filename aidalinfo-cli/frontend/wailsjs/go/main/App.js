@@ -62,6 +62,14 @@ export function NpmUpdateAction() {
   return window['go']['main']['App']['NpmUpdateAction']();
 }
 
+export function RestoreMongoBackup(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['RestoreMongoBackup'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
+export function RestoreS3Backup(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['RestoreS3Backup'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function TagAction(arg1, arg2) {
   return window['go']['main']['App']['TagAction'](arg1, arg2);
 }

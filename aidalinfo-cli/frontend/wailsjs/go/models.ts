@@ -1,5 +1,21 @@
 export namespace backend {
 	
+	export class BackupInfo {
+	    name: string;
+	    size: number;
+	    lastModified: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BackupInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.size = source["size"];
+	        this.lastModified = source["lastModified"];
+	    }
+	}
 	export class Commit {
 	    Date: string;
 	    Author: string;

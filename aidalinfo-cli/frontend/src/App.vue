@@ -3,11 +3,23 @@
     <div class="flex min-h-screen w-full">
       <Navigation />
       <div class="flex-1 flex flex-col">
-        <div class="flex items-center gap-4 p-4">
-          <SidebarTrigger />
-          <img id="logo" alt="Aidalinfo CLI" src="@/assets/aidalinfo.svg" class="h-7 w-auto"/>
+        <!-- Barre supérieure fixe avec espacement pour futurs composants -->
+        <div class="sticky top-0 z-10 flex items-center justify-between gap-4 p-4 bg-background border-b">
+          <div class="flex items-center gap-4">
+            <SidebarTrigger />
+            <img id="logo" alt="Aidalinfo CLI" src="@/assets/aidalinfo.svg" class="h-7 w-auto"/>
+          </div>
+          <!-- Espace réservé pour futurs composants à droite -->
+          <div class="flex items-center gap-2">
+            <Action />
+            <!-- Placeholder pour futurs composants -->
+          </div>
         </div>
-        <router-view />
+        <!-- Contenu principal avec scroll -->
+         
+        <div class="flex-1 overflow-auto">
+          <router-view />
+        </div>
       </div>
     </div>
   </SidebarProvider>

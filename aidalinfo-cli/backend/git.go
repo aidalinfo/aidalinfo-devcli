@@ -128,7 +128,7 @@ func createMerge(currentBranch, targetBranch, repoPath string) error {
 	fetchOutput, fetchErr := fetchCmd.CombinedOutput()
 	if fetchErr != nil {
 		return fmt.Errorf("Erreur lors du fetch : %s\n%s", fetchErr.Error(), string(fetchOutput))
-	}	
+	}
 	cmd := exec.Command("git", "-C", repoPath, "merge", "--no-ff", targetBranch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -161,7 +161,7 @@ func pushChanges(currentBranch, repoPath string) error {
 	cmd := exec.Command("git", "-C", repoPath, "push", "origin", currentBranch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Erreur lors du push : %s\n%s", err.Error(), string(output))
+		return fmt.Errorf("Erreur lors du push : %s\n%s", err, string(output))
 	}
 	return nil
 }
@@ -169,32 +169,30 @@ func pushChanges(currentBranch, repoPath string) error {
 func extractBranchName(decor string) string {
 	// Supprime les parenthèses de début et de fin s'il y en a.
 	decor = strings.Trim(decor, "()")
-	
+
 	// Découpe la chaîne sur la virgule (car Git sépare les références par une virgule).
 	parts := strings.Split(decor, ",")
 	for _, part := range parts {
-			part = strings.TrimSpace(part)
-			// Si la partie commence par "HEAD ->", on en extrait le nom.
-			if strings.HasPrefix(part, "HEAD ->") {
-					return strings.TrimSpace(strings.TrimPrefix(part, "HEAD ->"))
-			}
+		part = strings.TrimSpace(part)
+		// Si la partie commence par "HEAD ->", on en extrait le nom.
+		if strings.HasPrefix(part, "HEAD ->") {
+			return strings.TrimSpace(strings.TrimPrefix(part, "HEAD ->"))
+		}
 	}
 	// Optionnel : Si aucun "HEAD ->" n'est trouvé, retourner la première référence nettoyée
 	if len(parts) > 0 {
-			return strings.TrimSpace(parts[0])
+		return strings.TrimSpace(parts[0])
 	}
 	return ""
 }
-
 
 type Commit struct {
 	Date      string
 	Author    string
 	Message   string
 	Submodule string
-	Branch string
+	Branch    string
 }
-
 
 func GetLastCommits(submodules []string) ([]Commit, error) {
 	var allCommits []Commit
@@ -219,7 +217,7 @@ func GetLastCommits(submodules []string) ([]Commit, error) {
 					Author:    parts[1],
 					Message:   parts[2],
 					Submodule: filepath.Base(submodule),
-					Branch: parts[3],
+					Branch:    parts[3],
 				})
 			}
 		}
@@ -242,22 +240,23 @@ func GetDefaultBranch() (string, error) {
 	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
 	output, err := cmd.Output()
 	if err != nil {
+		LogToFrontend("error", "Impossible de déterminer la branche par défaut : "+err.Error())
 		return "", fmt.Errorf("impossible de déterminer la branche par défaut : %v", err)
 	}
 
 	// Extraire la branche par défaut du chemin
 	defaultBranch := strings.TrimSpace(strings.TrimPrefix(string(output), "refs/remotes/origin/"))
-	fmt.Printf(" 👉 Branche par défaut détectée : %s\n", defaultBranch)
+	LogToFrontend("info", "Branche par défaut détectée : "+defaultBranch)
 	return defaultBranch, nil
 }
 
 // Fonction qui récupère d'un repos
 func GetLastTags(repoPath string) ([]string, []string, error) {
-	// Obtenir tous les tags triés par date
-	println("Récupération des tags...")
+	LogToFrontend("info", "Récupération des tags...")
 	cmd := exec.Command("git", "-C", repoPath, "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)", "refs/tags/")
 	output, err := cmd.Output()
 	if err != nil {
+		LogToFrontend("error", "Erreur lors de la récupération des tags : "+err.Error())
 		return nil, nil, fmt.Errorf("Erreur lors de la récupération des tags : %s\n%s", err.Error(), string(output))
 	}
 
@@ -273,12 +272,11 @@ func GetLastTags(repoPath string) ([]string, []string, error) {
 			rcTags = append(rcTags, tag)
 		}
 	}
-	print("Tags récupérés avec succès.\n")
-	println("Nombre de tags v* :", len(vTags))
-	println("Nombre de tags rc-* :", len(rcTags))
-	//liste les tags
-	fmt.Println("Liste des tags v* :", strings.Join(vTags, ", "))
-	fmt.Println("Liste des tags rc-* :", strings.Join(rcTags, ", "))	
+	LogToFrontend("success", "Tags récupérés avec succès.")
+	LogToFrontend("info", fmt.Sprintf("Nombre de tags v* : %d", len(vTags)))
+	LogToFrontend("info", fmt.Sprintf("Nombre de tags rc-* : %d", len(rcTags)))
+	LogToFrontend("debug", "Liste des tags v* : "+strings.Join(vTags, ", "))
+	LogToFrontend("debug", "Liste des tags rc-* : "+strings.Join(rcTags, ", "))
 	return vTags, rcTags, nil
 }
 
@@ -319,22 +317,22 @@ func changeBranche(repoPath, branch string) error {
 func GitUpdateAction(submodules []string) error {
 	currentDir, err := os.Getwd()
 	if err != nil {
-			return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
+		return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
 	}
 
 	for _, submodule := range submodules {
-			fmt.Printf("📦 Mise à jour git dans %s\n", submodule)
-			if err := os.Chdir(submodule); err != nil {
-					return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
-			}
+		fmt.Printf("📦 Mise à jour git dans %s\n", submodule)
+		if err := os.Chdir(submodule); err != nil {
+			return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
+		}
 
-			if err := execCommand("git", "pull"); err != nil {
-					return err
-			}
+		if err := execCommand("git", "pull"); err != nil {
+			return err
+		}
 
-			if err := os.Chdir(currentDir); err != nil {
-					return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
-			}
+		if err := os.Chdir(currentDir); err != nil {
+			return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
+		}
 	}
 
 	return nil

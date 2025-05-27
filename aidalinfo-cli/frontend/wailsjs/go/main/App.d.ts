@@ -26,11 +26,15 @@ export function InstallNpmDependencies(arg1:boolean):Promise<void>;
 
 export function InstallSubmodules(arg1:string,arg2:Array<string>):Promise<void>;
 
-export function ListBackupsWithCreds(arg1:backend.S3Credentials,arg2:string):Promise<Array<string>>;
+export function ListBackupsWithCreds(arg1:backend.S3Credentials,arg2:string):Promise<Array<backend.BackupInfo>>;
 
 export function ListSubmodules(arg1:string):Promise<Array<string>>;
 
 export function NpmUpdateAction():Promise<void>;
+
+export function RestoreMongoBackup(arg1:backend.S3Credentials,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<void>;
+
+export function RestoreS3Backup(arg1:backend.S3Credentials,arg2:backend.S3Credentials,arg3:string,arg4:string,arg5:string,arg6:string):Promise<void>;
 
 export function TagAction(arg1:string,arg2:string):Promise<void>;
 
