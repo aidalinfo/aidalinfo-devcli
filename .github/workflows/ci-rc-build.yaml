@@ -32,7 +32,7 @@ jobs:
           cp aidalinfo-cli/build/bin/aidalinfo-copilot aidalinfo-copilot_linux_amd64
           chmod +x aidalinfo-copilot_linux_amd64
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: aidalinfo-copilot_linux_amd64
           path: aidalinfo-copilot_linux_amd64
@@ -62,7 +62,7 @@ jobs:
         run: |
           cp aidalinfo-cli/build/bin/aidalinfo-copilot.exe aidalinfo-copilot_windows_amd64.exe
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: aidalinfo-copilot_windows_amd64.exe
           path: aidalinfo-copilot_windows_amd64.exe
@@ -93,7 +93,7 @@ jobs:
           cp aidalinfo-cli/build/bin/aidalinfo-copilot aidalinfo-copilot_macos_arm64
           chmod +x aidalinfo-copilot_macos_arm64
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: aidalinfo-copilot_macos_arm64
           path: aidalinfo-copilot_macos_arm64
@@ -105,15 +105,15 @@ jobs:
       contents: write
     steps:
       - name: Download Linux artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: aidalinfo-copilot_linux_amd64
       - name: Download Windows artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: aidalinfo-copilot_windows_amd64.exe
       - name: Download macOS artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: aidalinfo-copilot_macos_arm64
       - name: Create release and upload artifacts
