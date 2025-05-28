@@ -1,4 +1,4 @@
-name: Build aidalinfo-copilot
+name: Build dev cli release candidate
 
 on:
   push:
@@ -6,34 +6,53 @@ on:
       - 'rc-v*.*.*'
 
 jobs:
-  ubuntu2404:
+  build-linux:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+      - name: Set up Golang
+        uses: actions/setup-go@v2
         with:
-          submodules: recursive
-      - uses: dAppServer/wails-build-action@v2.2
+          go-version: '1.23.4'
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
-          build-name: aidalinfo-copilot
-          build-platform: linux/amd64
-          package: false
-      - name: Upload artifact
+          node-version: '20'
+      - name: Install Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev build-essential pkg-config
+      - name: Install frontend dependencies
+        run: cd aidalinfo-cli/frontend && npm install
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      - name: Build Wails app (Linux)
+        run: cd aidalinfo-cli && $(go env GOPATH)/bin/wails build -platform linux/amd64
+      - name: Prepare binary (Linux)
+        run: |
+          cp aidalinfo-cli/build/bin/aidalinfo-copilot aidalinfo-copilot_linux_amd64
+          chmod +x aidalinfo-copilot_linux_amd64
+      - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: aidalinfo-copilot_linux_amd64
-          path: aidalinfo-cli/build/bin/aidalinfo-copilot
+          path: aidalinfo-copilot_linux_amd64
 
   release:
-    needs: ubuntu2404
-    runs-on: ubuntu-24.04
+    needs: [build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Download artifact
+      - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
           name: aidalinfo-copilot_linux_amd64
-      - name: Create release and upload artifact
+      - name: Create release and upload artifacts
         uses: softprops/action-gh-release@v1
         with:
-          files: aidalinfo-copilot
+          files: |
+            aidalinfo-copilot_linux_amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
