@@ -13,51 +13,56 @@ import (
 func SubmoduleAction(path string, branches ...string) error {
 	initialDir, err := os.Getwd()
 	if err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur récupération répertoire courant: %v", err))
 		return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
 	}
 	if path != "" && path != "." {
 		if err := os.Chdir(path); err != nil {
+			LogToFrontend("error", fmt.Sprintf("Erreur changement de répertoire vers %s: %v", path, err))
 			return fmt.Errorf("erreur lors du changement de répertoire vers %s: %v", path, err)
 		}
 	}
 	defer os.Chdir(initialDir)
 
-	fmt.Printf(" 👉 On est dans le répertoire %s\n", path)
+	LogToFrontend("info", fmt.Sprintf("On est dans le répertoire %s", path))
 
-	fmt.Println(" 🤖 On initialise et update les submodules")
+	LogToFrontend("info", "On initialise et update les submodules")
 	if err := execCommand("git", "submodule", "init"); err != nil {
+		LogToFrontend("error", "Erreur git submodule init")
 		return err
 	}
 	if err := execCommand("git", "submodule", "update"); err != nil {
+		LogToFrontend("error", "Erreur git submodule update")
 		return err
 	}
 
-	// Ajouter la branche par défaut à la liste des branches à tenter
 	defaultBranch, err := GetDefaultBranch()
 	if err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur récupération branche par défaut: %v", err))
 		return fmt.Errorf("erreur lors de la récupération de la branche par défaut : %v", err)
 	}
 	branches = append(branches, defaultBranch)
 
-	fmt.Printf(" 👉 Branches à essayer : %v\n", branches)
+	LogToFrontend("info", fmt.Sprintf("Branches à essayer : %v", branches))
 
 	for _, branch := range branches {
-		fmt.Printf(" 🤖 Tentative de checkout de la branche '%s'\n", branch)
+		LogToFrontend("info", fmt.Sprintf("Tentative de checkout de la branche '%s'", branch))
 		if err := execCommand("git", "checkout", branch); err == nil {
-			fmt.Printf(" ✅ Branche '%s' checkoutée avec succès\n", branch)
+			LogToFrontend("success", fmt.Sprintf("Branche '%s' checkoutée avec succès", branch))
 			break
 		}
-		fmt.Printf(" ⚠️ Impossible de checkout '%s'\n", branch)
+		LogToFrontend("warn", fmt.Sprintf("Impossible de checkout '%s'", branch))
 	}
 
-	fmt.Println(" 🤖 On pull")
+	LogToFrontend("info", "On pull")
 	if err := execCommand("git", "pull"); err != nil {
+		LogToFrontend("error", "Erreur git pull")
 		return err
 	}
 
-	// Gérer les submodules récursifs
 	content, err := os.ReadFile(".gitmodules")
 	if err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur lecture .gitmodules: %v", err))
 		return fmt.Errorf("erreur lors de la lecture de .gitmodules: %v", err)
 	}
 
@@ -74,41 +79,42 @@ func SubmoduleAction(path string, branches ...string) error {
 		}
 	}
 
-	fmt.Printf(" 👉 On a trouvé les submodules suivants : %v\n", submodules)
+	LogToFrontend("info", fmt.Sprintf("Submodules trouvés : %v", submodules))
 
 	for _, submodule := range submodules {
-		fmt.Printf(" 👉👉 On est dans %s et on a trouvé le submodule: %s\n", path, submodule)
+		LogToFrontend("info", fmt.Sprintf("On entre dans le submodule: %s", submodule))
 		absSubmodulePath := filepath.Join(path, submodule)
-		fmt.Printf(" 🤖 On va dans le répertoire %s\n", absSubmodulePath)
+		LogToFrontend("info", fmt.Sprintf("On va dans le répertoire %s", absSubmodulePath))
 
 		if err := os.Chdir(absSubmodulePath); err != nil {
+			LogToFrontend("error", fmt.Sprintf("Erreur changement de répertoire: chdir %s: %v", absSubmodulePath, err))
 			return fmt.Errorf("erreur lors du changement de répertoire: chdir %s: %v", absSubmodulePath, err)
 		}
 
 		for _, branch := range branches {
-			fmt.Printf(" 🤖 Tentative de checkout de la branche '%s' pour le submodule\n", branch)
+			LogToFrontend("info", fmt.Sprintf("Tentative de checkout de la branche '%s' pour le submodule", branch))
 			if err := execCommand("git", "checkout", branch); err == nil {
-				fmt.Printf(" ✅ Submodule sur branche '%s' checkouté avec succès\n", branch)
+				LogToFrontend("success", fmt.Sprintf("Submodule sur branche '%s' checkouté avec succès", branch))
 				break
 			}
-			fmt.Printf(" ⚠️ Submodule : Impossible de checkout '%s'\n", branch)
+			LogToFrontend("warn", fmt.Sprintf("Submodule : Impossible de checkout '%s'", branch))
 		}
 
-		fmt.Println(" 🤖 On pull")
+		LogToFrontend("info", "On pull (submodule)")
 		if err := execCommand("git", "pull"); err != nil {
+			LogToFrontend("error", "Erreur git pull (submodule)")
 			return err
 		}
 
-		// Vérifier s'il y a des submodules récursifs
 		if _, err := os.Stat(".gitmodules"); err == nil {
-			fmt.Println(" 👉👉 Il y a un fichier .gitmodules")
-			fmt.Println(" 🤖🤖 RECURSIVITE !")
+			LogToFrontend("info", "Submodule contient un .gitmodules, récursivité !")
 			if err := SubmoduleAction(absSubmodulePath, branches...); err != nil {
 				return err
 			}
 		}
 
 		if err := os.Chdir(initialDir); err != nil {
+			LogToFrontend("error", fmt.Sprintf("Erreur retour répertoire parent: %v", err))
 			return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
 		}
 	}
@@ -116,43 +122,53 @@ func SubmoduleAction(path string, branches ...string) error {
 	return nil
 }
 
-func NpmAction(all bool) error {
+// NpmAction lance npm install récursif à partir du path donné si all == true
+func NpmAction(path string, all bool) error {
 	if !all {
 		return nil
 	}
-	entries, err := os.ReadDir(".")
+	return npmInstallRecursive(path)
+}
+
+func npmInstallRecursive(path string) error {
+	entries, err := os.ReadDir(path)
 	if err != nil {
-		return fmt.Errorf("erreur lors de la lecture du répertoire: %v", err)
+		LogToFrontend("warn", fmt.Sprintf("Impossible de lire le répertoire %s (permissions?): %v - on continue", path, err))
+		return nil // On continue même si on ne peut pas lire le répertoire
 	}
 
+	// Si package.json existe dans ce dossier, on fait npm install
+	packageJsonPath := filepath.Join(path, "package.json")
+	if _, err := os.Stat(packageJsonPath); err == nil {
+		LogToFrontend("info", fmt.Sprintf("%s : package.json existe, lancement de 'npm install'...", path))
+		cmd := exec.Command("npm", "install", "--no-save")
+		cmd.Dir = path
+		stdoutStderr, err := cmd.CombinedOutput()
+		LogToFrontend("info", string(stdoutStderr))
+		if err != nil {
+			LogToFrontend("error", fmt.Sprintf("Erreur npm install dans %s: %v", path, err))
+			return err
+		}
+		LogToFrontend("success", fmt.Sprintf("npm install terminé avec succès dans %s.", path))
+	}
+
+	// Parcours récursif des sous-dossiers
 	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		fmt.Println(entry.Name())
-		if err := os.Chdir(entry.Name()); err != nil {
-			return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
-		}
-
-		if _, err := os.Stat("package.json"); err == nil {
-			fmt.Println("package.json existe, on installe")
-			if err := execCommand("npm", "install", "--no-save"); err != nil {
-				return err
+		if entry.IsDir() && entry.Name() != "node_modules" && entry.Name() != ".git" {
+			subPath := filepath.Join(path, entry.Name())
+			if err := npmInstallRecursive(subPath); err != nil {
+				// On log l'erreur mais on continue avec les autres dossiers
+				LogToFrontend("warn", fmt.Sprintf("Erreur dans le sous-dossier %s: %v - on continue", subPath, err))
 			}
 		}
-
-		if err := os.Chdir(".."); err != nil {
-			return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
-		}
 	}
-
 	return nil
 }
 
 func TagAction(version, message string) error {
 	entries, err := os.ReadDir(".")
 	if err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur lecture répertoire: %v", err))
 		return fmt.Errorf("erreur lors de la lecture du répertoire: %v", err)
 	}
 
@@ -161,22 +177,26 @@ func TagAction(version, message string) error {
 			continue
 		}
 
-		fmt.Println(entry.Name())
+		LogToFrontend("info", fmt.Sprintf("TagAction: %s", entry.Name()))
 		if err := os.Chdir(entry.Name()); err != nil {
+			LogToFrontend("error", fmt.Sprintf("Erreur changement de répertoire: %v", err))
 			return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
 		}
 
 		if _, err := os.Stat("package.json"); err == nil {
-			fmt.Println("package.json existe, on tag")
+			LogToFrontend("info", "package.json existe, on tag")
 			if err := execCommand("git", "tag", "-a", version, "-m", message); err != nil {
+				LogToFrontend("error", "Erreur git tag")
 				return err
 			}
 			if err := execCommand("git", "push", "--tags"); err != nil {
+				LogToFrontend("error", "Erreur git push --tags")
 				return err
 			}
 		}
 
 		if err := os.Chdir(".."); err != nil {
+			LogToFrontend("error", fmt.Sprintf("Erreur retour répertoire parent: %v", err))
 			return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
 		}
 	}
@@ -194,36 +214,39 @@ func execCommand(name string, args ...string) error {
 func NpmUpdateAction() error {
 	currentDir, err := os.Getwd()
 	if err != nil {
-			return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
+		LogToFrontend("error", fmt.Sprintf("Erreur récupération répertoire courant: %v", err))
+		return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
 	}
 
 	entries, err := os.ReadDir(".")
 	if err != nil {
-			return fmt.Errorf("erreur lors de la lecture du répertoire: %v", err)
+		LogToFrontend("error", fmt.Sprintf("Erreur lecture répertoire: %v", err))
+		return fmt.Errorf("erreur lors de la lecture du répertoire: %v", err)
 	}
 
 	for _, entry := range entries {
-			// Vérifier si c'est un dossier
-			if !entry.IsDir() {
-					continue
+		if !entry.IsDir() {
+			continue
+		}
+
+		packagePath := fmt.Sprintf("%s/%s/package.json", currentDir, entry.Name())
+		if _, err := os.Stat(packagePath); err == nil {
+			LogToFrontend("info", fmt.Sprintf("NpmUpdateAction: %s", entry.Name()))
+			if err := os.Chdir(entry.Name()); err != nil {
+				LogToFrontend("error", fmt.Sprintf("Erreur changement de répertoire: %v", err))
+				return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
 			}
 
-			// Vérifier si package.json existe dans le dossier
-			packagePath := fmt.Sprintf("%s/%s/package.json", currentDir, entry.Name())
-			if _, err := os.Stat(packagePath); err == nil {
-					fmt.Printf("📦 Mise à jour npm dans %s\n", entry.Name())
-					if err := os.Chdir(entry.Name()); err != nil {
-							return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
-					}
-
-					if err := execCommand("npm", "update"); err != nil {
-							return err
-					}
-
-					if err := os.Chdir(currentDir); err != nil {
-							return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
-					}
+			if err := execCommand("npm", "update"); err != nil {
+				LogToFrontend("error", "Erreur npm update")
+				return err
 			}
+
+			if err := os.Chdir(currentDir); err != nil {
+				LogToFrontend("error", fmt.Sprintf("Erreur retour répertoire parent: %v", err))
+				return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
+			}
+		}
 	}
 
 	return nil

@@ -17,9 +17,9 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "aidalinfo-cli",
-		Width:  1920,
-		Height: 1080,
+		Title:            "aidalinfo-copilot",
+		Width:            1920,
+		Height:           1080,
 		WindowStartState: options.Maximised,
 		AssetServer: &assetserver.Options{
 			Assets: assets,

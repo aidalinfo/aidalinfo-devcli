@@ -1,19 +1,18 @@
 <template>
   <Card class="w-full max-w-md">
-    <CardHeader>      <div class="flex items-center justify-between">
+    <CardHeader>
+      <div class="flex items-center justify-between">
         <CardTitle class="text-lg">{{ submodule.name }}</CardTitle>
         <div class="flex items-center gap-2">
           <Badge :variant="getBranchVariant(submodule.currentBranch)" class="text-xs">
             {{ submodule.currentBranch }}
           </Badge>
-          <div 
-            v-if="submodule.lastCommits && submodule.lastCommits.length > 0"
-            class="cursor-pointer p-1 rounded-full hover:bg-gray-100 transition-colors"
-            :title="getLastCommitTooltip()"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="m9 12 2 2 4-4"/>
+          <div v-if="submodule.lastCommits && submodule.lastCommits.length > 0"
+            class="cursor-pointer p-1 rounded-full hover:bg-gray-100 transition-colors" :title="getLastCommitTooltip()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" class="text-gray-500">
+              <circle cx="12" cy="12" r="10" />
+              <path d="m9 12 2 2 4-4" />
             </svg>
           </div>
         </div>
@@ -22,7 +21,7 @@
         {{ submodule.path }}
       </CardDescription>
     </CardHeader>
-      <CardContent class="space-y-4">
+    <CardContent class="space-y-4">
       <!-- Tags -->
       <div class="space-y-2" v-if="submodule.tags">
         <h4 class="text-sm font-medium">Tags</h4>
@@ -46,23 +45,11 @@
     </CardContent>
 
     <CardFooter class="flex gap-2">
-      <Button 
-        @click="handleRcTag" 
-        variant="outline" 
-        size="sm"
-        class="flex-1"
-        :disabled="loading"
-      >
+      <Button @click="handleRcTag" variant="outline" size="sm" class="flex-1" :disabled="loading">
         <span class="mr-1">🔄</span>
         Tag RC
       </Button>
-      <Button 
-        @click="handleProdTag" 
-        variant="default" 
-        size="sm"
-        class="flex-1"
-        :disabled="loading"
-      >
+      <Button @click="handleProdTag" variant="default" size="sm" class="flex-1" :disabled="loading">
         <span class="mr-1">🚀</span>
         Tag Prod
       </Button>

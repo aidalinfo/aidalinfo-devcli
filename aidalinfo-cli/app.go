@@ -1,7 +1,7 @@
 package main
 
 import (
-	"aidalinfo-cli/backend"
+	"aidalinfo-copilot/backend"
 	"context"
 	"fmt"
 
@@ -22,9 +22,8 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	backend.AppCtxForLogToFrontend = ctx // Permet à LogToFrontend d'envoyer les logs au frontend
-	// Exemple d'utilisation
-	backend.LogToFrontend("info", "[Wails] Application démarrée.")
+	// Initialiser le contexte pour LogToFrontend
+	backend.AppCtxForLogToFrontend = ctx
 	// Force la fenêtre à se maximiser sur l'écran courant au démarrage
 	runtime.WindowMaximise(ctx)
 }
@@ -64,8 +63,8 @@ func (a *App) InstallSubmodules(path string, branches []string) error {
 	return backend.SubmoduleAction(path, branches...)
 }
 
-func (a *App) InstallNpmDependencies(all bool) error {
-	return backend.NpmAction(all)
+func (a *App) InstallNpmDependencies(path string, all bool) error {
+	return backend.NpmAction(path, all)
 }
 
 func (a *App) UpdateGitSubmodules(submodules []string) error {

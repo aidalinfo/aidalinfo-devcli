@@ -63,8 +63,9 @@ const handleSetup = async () => {
     await InstallSubmodules(scanPath.value || '.', branches.value)
     toast.success('Checkout des submodules terminé !')
     if (npmInstall.value) {
-      await InstallNpmDependencies(true)
+      await InstallNpmDependencies(scanPath.value || '.', true)      
       toast.success('npm install terminé sur tous les modules !')
+
     }
   } catch (err: any) {
     const msg = err?.message || err?.toString() || 'Erreur lors du setup'
@@ -77,7 +78,7 @@ const handleSetup = async () => {
 </script>
 
 <template>
-  <Card class="max-w-2xl mx-auto mt-8">
+  <Card class="mx-5 mt-10">
     <CardHeader>
       <CardTitle>Setup des submodules</CardTitle>
       <CardDescription>

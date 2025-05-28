@@ -53,7 +53,7 @@
 
   <Card class="mx-5 mt-10">
     <CardHeader>
-      <CardTitle>Paramètres avancés S3</CardTitle>
+      <CardTitle>Paramètres locaux S3</CardTitle>
       <CardDescription>
         Configurez l'hôte, le port et la région S3 pour la restauration locale (MinIO ou autre).
       </CardDescription>

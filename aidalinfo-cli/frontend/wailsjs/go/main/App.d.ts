@@ -22,7 +22,7 @@ export function GitStatus(arg1:string):Promise<string>;
 
 export function Greet(arg1:string):Promise<string>;
 
-export function InstallNpmDependencies(arg1:boolean):Promise<void>;
+export function InstallNpmDependencies(arg1:string,arg2:boolean):Promise<void>;
 
 export function InstallSubmodules(arg1:string,arg2:Array<string>):Promise<void>;
 

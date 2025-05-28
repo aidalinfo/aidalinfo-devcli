@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -30,6 +30,32 @@ const loading = ref(false)
 const error = ref('')
 const mongoBackups = ref<backend.BackupInfo[]>([])
 const bucketBackups = ref<backend.BackupInfo[]>([])
+
+const PAGE_SIZE = 10
+const mongoPage = ref(1)
+const bucketPage = ref(1)
+
+const mongoTotalPages = computed(() => Math.ceil(mongoBackups.value.length / PAGE_SIZE) || 1)
+const bucketTotalPages = computed(() => Math.ceil(bucketBackups.value.length / PAGE_SIZE) || 1)
+
+const pagedMongoBackups = computed(() => {
+  const start = (mongoPage.value - 1) * PAGE_SIZE
+  return mongoBackups.value.slice(start, start + PAGE_SIZE)
+})
+const pagedBucketBackups = computed(() => {
+  const start = (bucketPage.value - 1) * PAGE_SIZE
+  return bucketBackups.value.slice(start, start + PAGE_SIZE)
+})
+
+function changeMongoPage(delta: number) {
+  mongoPage.value = Math.max(1, Math.min(mongoPage.value + delta, mongoTotalPages.value))
+}
+function changeBucketPage(delta: number) {
+  bucketPage.value = Math.max(1, Math.min(bucketPage.value + delta, bucketTotalPages.value))
+}
+
+watch(mongoBackups, () => { mongoPage.value = 1 })
+watch(bucketBackups, () => { bucketPage.value = 1 })
 
 function getCurrentProject() {
   return PROJECTS.find(p => p.value === project.value)!
@@ -154,7 +180,7 @@ async function restoreS3(file: backend.BackupInfo) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="file in mongoBackups" :key="file.name">
+            <TableRow v-for="file in pagedMongoBackups" :key="file.name">
               <TableCell>{{ file.name }}</TableCell>
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
@@ -169,6 +195,11 @@ async function restoreS3(file: backend.BackupInfo) {
             </TableRow>
           </TableBody>
         </Table>
+        <div class="flex items-center justify-between mt-2" v-if="mongoTotalPages > 1">
+          <Button size="sm" variant="outline" :disabled="mongoPage === 1" @click="changeMongoPage(-1)">Précédent</Button>
+          <span>Page {{ mongoPage }} / {{ mongoTotalPages }}</span>
+          <Button size="sm" variant="outline" :disabled="mongoPage === mongoTotalPages" @click="changeMongoPage(1)">Suivant</Button>
+        </div>
       </CardContent>
     </Card>
 
@@ -189,7 +220,7 @@ async function restoreS3(file: backend.BackupInfo) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="file in bucketBackups" :key="file.name">
+            <TableRow v-for="file in pagedBucketBackups" :key="file.name">
               <TableCell>{{ file.name }}</TableCell>
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
@@ -204,6 +235,11 @@ async function restoreS3(file: backend.BackupInfo) {
             </TableRow>
           </TableBody>
         </Table>
+        <div class="flex items-center justify-between mt-2" v-if="bucketTotalPages > 1">
+          <Button size="sm" variant="outline" :disabled="bucketPage === 1" @click="changeBucketPage(-1)">Précédent</Button>
+          <span>Page {{ bucketPage }} / {{ bucketTotalPages }}</span>
+          <Button size="sm" variant="outline" :disabled="bucketPage === bucketTotalPages" @click="changeBucketPage(1)">Suivant</Button>
+        </div>
       </CardContent>
     </Card>
 

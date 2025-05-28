@@ -1,4 +1,4 @@
-module aidalinfo-cli
+module aidalinfo-copilot
 
 go 1.23.0
 

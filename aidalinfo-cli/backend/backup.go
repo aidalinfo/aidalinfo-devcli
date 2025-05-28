@@ -103,6 +103,30 @@ func ListBackupsWithCreds(ctx context.Context, creds S3Credentials, s3Dir string
 	return files, nil
 }
 
+// ListBackupsWithCredsPaged liste les backups S3 paginés (10 par page)
+func ListBackupsWithCredsPaged(ctx context.Context, creds S3Credentials, s3Dir string, page int, pageSize int) ([]BackupInfo, int, error) {
+	all, err := ListBackupsWithCreds(ctx, creds, s3Dir)
+	if err != nil {
+		return nil, 0, err
+	}
+	total := len(all)
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if page <= 0 {
+		page = 1
+	}
+	start := (page - 1) * pageSize
+	if start > total {
+		return []BackupInfo{}, total, nil
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	return all[start:end], total, nil
+}
+
 func lastPathPart(path string) string {
 	parts := strings.Split(path, "/")
 	return parts[len(parts)-1]
@@ -259,6 +283,15 @@ func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string,
 	if err != nil {
 		return err
 	}
+
+	// Récupère la taille du fichier pour la progression
+	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &bucket, Key: &objectName})
+	var totalSize int64 = 0
+	if err == nil && head.ContentLength != nil {
+		totalSize = *head.ContentLength
+		LogToFrontend("info", fmt.Sprintf("Taille du backup à télécharger: %.2f MB", float64(totalSize)/(1024*1024)))
+	}
+
 	respBody, err := downloadWithRetry(presignedURL, 3, 30*time.Minute)
 	if err != nil {
 		return fmt.Errorf("erreur téléchargement HTTP: %v", err)
@@ -275,10 +308,18 @@ func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string,
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
-	_, err = io.Copy(tmpFile, respBody)
+
+	// Progression du téléchargement
+	progressReader := &progressReaderWithLog{
+		r:     respBody,
+		total: totalSize,
+	}
+	LogToFrontend("info", "Début du téléchargement du backup MongoDB...")
+	_, err = io.Copy(tmpFile, progressReader)
 	if err != nil {
 		return fmt.Errorf("erreur écriture fichier: %v", err)
 	}
+	LogToFrontend("success", "Téléchargement du backup MongoDB terminé.")
 
 	LogToFrontend("debug", fmt.Sprintf("mongoHost=%s, mongoPort=%s, mongoUser=%s, mongoPassword=%s", mongoHost, mongoPort, mongoUser, mongoPassword))
 
@@ -290,6 +331,7 @@ func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string,
 	if mongoPassword != "" {
 		args = append(args, "--password", mongoPassword)
 	}
+	LogToFrontend("info", "Début de la restauration mongorestore...")
 	cmd := exec.Command("mongorestore", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -298,6 +340,7 @@ func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string,
 		LogToFrontend("error", fmt.Sprintf("mongorestore error: %v", err))
 		return fmt.Errorf("erreur restauration mongorestore: %v", err)
 	}
+	LogToFrontend("success", "Restauration mongorestore terminée avec succès.")
 	return nil
 }
 
