@@ -29,13 +29,13 @@ jobs:
         run: cd aidalinfo-cli && $(go env GOPATH)/bin/wails build -platform linux/amd64
       - name: Prepare binary (Linux)
         run: |
-          cp aidalinfo-cli/build/bin/aidalinfo-cli aidalinfo-cli_linux_amd64
-          chmod +x aidalinfo-cli_linux_amd64
+          cp aidalinfo-cli/build/bin/aidalinfo-copilot aidalinfo-copilot_linux_amd64
+          chmod +x aidalinfo-copilot_linux_amd64
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v3
         with:
-          name: aidalinfo-cli_linux_amd64
-          path: aidalinfo-cli_linux_amd64
+          name: aidalinfo-copilot_linux_amd64
+          path: aidalinfo-copilot_linux_amd64
 
   build-windows:
     runs-on: ubuntu-latest
@@ -60,12 +60,12 @@ jobs:
         run: cd aidalinfo-cli && GOOS=windows GOARCH=amd64 $(go env GOPATH)/bin/wails build -platform windows/amd64
       - name: Prepare binary (Windows)
         run: |
-          cp aidalinfo-cli/build/bin/aidalinfo-cli.exe aidalinfo-cli_windows_amd64.exe
+          cp aidalinfo-cli/build/bin/aidalinfo-copilot.exe aidalinfo-copilot_windows_amd64.exe
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v3
         with:
-          name: aidalinfo-cli_windows_amd64.exe
-          path: aidalinfo-cli_windows_amd64.exe
+          name: aidalinfo-copilot_windows_amd64.exe
+          path: aidalinfo-copilot_windows_amd64.exe
 
   build-macos:
     runs-on: macos-latest
@@ -90,13 +90,13 @@ jobs:
         run: cd aidalinfo-cli && $(go env GOPATH)/bin/wails build -platform darwin/arm64
       - name: Prepare binary (macOS arm64)
         run: |
-          cp aidalinfo-cli/build/bin/aidalinfo-cli aidalinfo-cli_macos_arm64
-          chmod +x aidalinfo-cli_macos_arm64
+          cp aidalinfo-cli/build/bin/aidalinfo-copilot aidalinfo-copilot_macos_arm64
+          chmod +x aidalinfo-copilot_macos_arm64
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v3
         with:
-          name: aidalinfo-cli_macos_arm64
-          path: aidalinfo-cli_macos_arm64
+          name: aidalinfo-copilot_macos_arm64
+          path: aidalinfo-copilot_macos_arm64
 
   release:
     needs: [build-linux, build-windows, build-macos]
@@ -107,21 +107,21 @@ jobs:
       - name: Download Linux artifact
         uses: actions/download-artifact@v3
         with:
-          name: aidalinfo-cli_linux_amd64
+          name: aidalinfo-copilot_linux_amd64
       - name: Download Windows artifact
         uses: actions/download-artifact@v3
         with:
-          name: aidalinfo-cli_windows_amd64.exe
+          name: aidalinfo-copilot_windows_amd64.exe
       - name: Download macOS artifact
         uses: actions/download-artifact@v3
         with:
-          name: aidalinfo-cli_macos_arm64
+          name: aidalinfo-copilot_macos_arm64
       - name: Create release and upload artifacts
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            aidalinfo-cli_linux_amd64
-            aidalinfo-cli_windows_amd64.exe
-            aidalinfo-cli_macos_arm64
+            aidalinfo-copilot_linux_amd64
+            aidalinfo-copilot_windows_amd64.exe
+            aidalinfo-copilot_macos_arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
