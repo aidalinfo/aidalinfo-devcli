@@ -345,7 +345,7 @@ func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string,
 }
 
 // RestoreS3Backup télécharge un backup S3 (tar.gz) et le restaure dans un S3 local (MinIO ou autre)
-func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S3Credentials, s3Path, s3Host, s3Port, s3Region string) error {
+func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S3Credentials, s3Path, s3Host, s3Port, s3Region string, s3UseHttps bool) error {
 	bucket := "backup-global"
 	objectName := s3Path
 
@@ -575,13 +575,19 @@ func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S
 	LogToFrontend("debug", fmt.Sprintf("Bucket extrait: %s, chemin: %s", bucketDir, bucketPath))
 
 	// Utilise les credentials locaux pour uploader dans le S3 local
+	// Détermine le protocole à utiliser
+	protocol := "http"
+	if s3UseHttps {
+		protocol = "https"
+	}
+	
 	s3LocalCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(s3Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(localCreds.AccessKey, localCreds.SecretKey, "")),
 		config.WithEndpointResolverWithOptions(
 			aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 				return aws.Endpoint{
-					URL:               fmt.Sprintf("http://%s:%s", s3Host, s3Port),
+					URL:               fmt.Sprintf("%s://%s:%s", protocol, s3Host, s3Port),
 					HostnameImmutable: true,
 				}, nil
 			}),

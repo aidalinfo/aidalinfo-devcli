@@ -109,7 +109,7 @@ func (a *App) RestoreMongoBackup(creds backend.S3Credentials, s3Path, mongoHost,
 
 // Expose RestoreS3Backup to frontend
 // wailsjs/go/main/App.d.ts doit être régénéré pour :
-// export function RestoreS3Backup(cloudCreds: backend.S3Credentials, localCreds: backend.S3Credentials, s3Path: string, s3Host: string, s3Port: string, s3Region: string): Promise<void>;
-func (a *App) RestoreS3Backup(cloudCreds backend.S3Credentials, localCreds backend.S3Credentials, s3Path, s3Host, s3Port, s3Region string) error {
-	return backend.RestoreS3Backup(a.ctx, cloudCreds, localCreds, s3Path, s3Host, s3Port, s3Region)
+// export function RestoreS3Backup(cloudCreds: backend.S3Credentials, localCreds: backend.S3Credentials, s3Path: string, s3Host: string, s3Port: string, s3Region: string, s3UseHttps: boolean): Promise<void>;
+func (a *App) RestoreS3Backup(cloudCreds backend.S3Credentials, localCreds backend.S3Credentials, s3Path, s3Host, s3Port, s3Region string, s3UseHttps bool) error {
+	return backend.RestoreS3Backup(a.ctx, cloudCreds, localCreds, s3Path, s3Host, s3Port, s3Region, s3UseHttps)
 }

@@ -122,6 +122,7 @@ async function restoreS3(file: backend.BackupInfo) {
   const s3Host = localStorage.getItem('s3_host') || 'localhost'
   const s3Port = localStorage.getItem('s3_port') || '9000'
   const s3Region = localStorage.getItem('s3_region') || 'fr-par'
+  const s3UseHttps = localStorage.getItem('s3_use_https') === 'true'
   const s3LocalAccessKey = localStorage.getItem('s3local_access_key') || ''
   const s3LocalSecretKey = localStorage.getItem('s3local_secret_key') || ''
   const localCreds = { accessKey: s3LocalAccessKey, secretKey: s3LocalSecretKey }
@@ -134,7 +135,8 @@ async function restoreS3(file: backend.BackupInfo) {
       current.bucket + file.name,
       s3Host,
       s3Port,
-      s3Region
+      s3Region,
+      s3UseHttps
     )
     toast.success('Restauration S3 local terminée avec succès !')
   } catch (e: any) {
