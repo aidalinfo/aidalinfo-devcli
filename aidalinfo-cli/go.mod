@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.14
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.67
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.4
+	github.com/spf13/cobra v1.8.1
 	github.com/wailsapp/wails/v2 v2.10.1
 )
 

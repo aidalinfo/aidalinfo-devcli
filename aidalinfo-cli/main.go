@@ -1,7 +1,9 @@
 package main
 
 import (
+	"aidalinfo-copilot/cmd"
 	"embed"
+	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -12,6 +14,14 @@ import (
 var assets embed.FS
 
 func main() {
+	// Check if running in CLI mode (if there are command line arguments)
+	if len(os.Args) > 1 {
+		// Run in CLI mode with Cobra
+		cmd.Execute()
+		return
+	}
+
+	// Otherwise, run in GUI mode with Wails
 	// Create an instance of the app structure
 	app := NewApp()
 
