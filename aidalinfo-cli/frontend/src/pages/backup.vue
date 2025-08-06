@@ -58,6 +58,10 @@ function changeBucketPage(delta: number) {
 watch(mongoBackups, () => { mongoPage.value = 1 })
 watch(bucketBackups, () => { bucketPage.value = 1 })
 
+watch(project, () => {
+  fetchBackups()
+})
+
 function getCurrentProject() {
   return PROJECTS.find(p => p.value === project.value)!
 }
