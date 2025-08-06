@@ -23,31 +23,13 @@
 
   <Card class="mx-5 mt-10">
     <CardHeader>
-      <CardTitle>Paramètres connexion MongoDB</CardTitle>
+      <CardTitle>Serveurs MongoDB</CardTitle>
       <CardDescription>
-        Configurez la connexion à votre base MongoDB (pour restauration ou dump).
+        Gérez vos différents serveurs MongoDB pour la restauration et les dumps.
       </CardDescription>
     </CardHeader>
     <CardContent>
-      <form @submit.prevent="saveMongo" class="space-y-6">
-        <div>
-          <Label for="mongo-host">Adresse</Label>
-          <Input id="mongo-host" v-model="mongoHost" placeholder="localhost" />
-        </div>
-        <div>
-          <Label for="mongo-port">Port</Label>
-          <Input id="mongo-port" v-model="mongoPort" type="number" placeholder="27017" />
-        </div>
-        <div>
-          <Label for="mongo-user">Utilisateur</Label>
-          <Input id="mongo-user" v-model="mongoUser" placeholder="" />
-        </div>
-        <div>
-          <Label for="mongo-password">Mot de passe</Label>
-          <Input id="mongo-password" v-model="mongoPassword" type="password" placeholder="" />
-        </div>
-        <Button type="submit" class="w-full">Sauvegarder</Button>
-      </form>
+      <MongoServerManager />
     </CardContent>
   </Card>
 
@@ -105,13 +87,10 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import MongoServerManager from '@/components/MongoServerManager.vue'
 
 const accessKey = ref('')
 const secretKey = ref('')
-const mongoHost = ref('localhost')
-const mongoPort = ref('27017')
-const mongoUser = ref('')
-const mongoPassword = ref('')
 const s3Host = ref('localhost')
 const s3Port = ref('9000')
 const s3Region = ref('fr-par')
@@ -123,10 +102,6 @@ const s3LocalSecretKey = ref('')
 onMounted(() => {
   accessKey.value = localStorage.getItem('s3_access_key') || ''
   secretKey.value = localStorage.getItem('s3_secret_key') || ''
-  mongoHost.value = localStorage.getItem('mongo_host') || 'localhost'
-  mongoPort.value = localStorage.getItem('mongo_port') || '27017'
-  mongoUser.value = localStorage.getItem('mongo_user') || ''
-  mongoPassword.value = localStorage.getItem('mongo_password') || ''
   s3Host.value = localStorage.getItem('s3_host') || 'localhost'
   s3Port.value = localStorage.getItem('s3_port') || '9000'
   s3Region.value = localStorage.getItem('s3_region') || 'fr-par'
@@ -140,13 +115,7 @@ function saveCredentials() {
   localStorage.setItem('s3_secret_key', secretKey.value)
   alert('Clés S3 sauvegardées localement !')
 }
-function saveMongo() {
-  localStorage.setItem('mongo_host', mongoHost.value)
-  localStorage.setItem('mongo_port', mongoPort.value)
-  localStorage.setItem('mongo_user', mongoUser.value)
-  localStorage.setItem('mongo_password', mongoPassword.value)
-  alert('Paramètres Mongo sauvegardés !')
-}
+
 function saveS3Advanced() {
   localStorage.setItem('s3_host', s3Host.value)
   localStorage.setItem('s3_port', s3Port.value)
