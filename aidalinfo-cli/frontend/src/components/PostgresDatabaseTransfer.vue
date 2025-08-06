@@ -304,7 +304,7 @@ const getDestinationServer = (): PostgresServer | null => {
       isDefault: false
     };
   } else {
-    return PostgresServersManager.getServerById(selectedDestinationId.value);
+    return PostgresServersManager.getServerById(selectedDestinationId.value) || null;
   }
 };
 

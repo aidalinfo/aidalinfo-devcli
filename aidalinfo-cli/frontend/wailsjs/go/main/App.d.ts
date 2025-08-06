@@ -14,6 +14,8 @@ export function DumpMongoDatabase(arg1:string,arg2:string,arg3:string,arg4:strin
 
 export function DumpMySQLDatabase(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
 
+export function DumpPostgresDatabase(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
+
 export function GetBranches(arg1:string):Promise<Array<string>>;
 
 export function GetCurrentBranch(arg1:string):Promise<string>;
@@ -40,6 +42,8 @@ export function ListMongoDatabases(arg1:string,arg2:string,arg3:string,arg4:stri
 
 export function ListMySQLDatabases(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<string>>;
 
+export function ListPostgresDatabases(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<string>>;
+
 export function ListSubmodules(arg1:string):Promise<Array<string>>;
 
 export function NpmUpdateAction(arg1:string):Promise<void>;
@@ -50,6 +54,8 @@ export function RestoreMongoBackup(arg1:backend.S3Credentials,arg2:string,arg3:s
 
 export function RestoreMySQLBackup(arg1:backend.S3Credentials,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<void>;
 
+export function RestorePostgresBackup(arg1:backend.S3Credentials,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<void>;
+
 export function RestoreS3Backup(arg1:backend.S3Credentials,arg2:backend.S3Credentials,arg3:string,arg4:string,arg5:string,arg6:string,arg7:boolean):Promise<void>;
 
 export function TagAction(arg1:string,arg2:string):Promise<void>;
@@ -59,5 +65,7 @@ export function TestMySQLConnection(arg1:string,arg2:string,arg3:string,arg4:str
 export function TransferMongoDatabase(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:boolean):Promise<void>;
 
 export function TransferMySQLDatabase(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:boolean):Promise<void>;
+
+export function TransferPostgresDatabase(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:boolean):Promise<void>;
 
 export function UpdateGitSubmodules(arg1:string,arg2:Array<string>):Promise<void>;

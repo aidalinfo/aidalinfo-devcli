@@ -232,7 +232,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { MySQLServersManager, type MySQLServer } from '@/utils/mysqlServers';
-import { ListMySQLDatabases, TransferMySQLDatabase } from '@/wailsjs/go/main/App';
+import { ListMySQLDatabases, TransferMySQLDatabase } from '../../wailsjs/go/main/App';
 import { toast } from 'vue-sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';

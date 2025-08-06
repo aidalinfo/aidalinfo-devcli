@@ -26,6 +26,10 @@ export function DumpMySQLDatabase(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['DumpMySQLDatabase'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function DumpPostgresDatabase(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['DumpPostgresDatabase'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function GetBranches(arg1) {
   return window['go']['main']['App']['GetBranches'](arg1);
 }
@@ -78,6 +82,10 @@ export function ListMySQLDatabases(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ListMySQLDatabases'](arg1, arg2, arg3, arg4);
 }
 
+export function ListPostgresDatabases(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ListPostgresDatabases'](arg1, arg2, arg3, arg4);
+}
+
 export function ListSubmodules(arg1) {
   return window['go']['main']['App']['ListSubmodules'](arg1);
 }
@@ -98,6 +106,10 @@ export function RestoreMySQLBackup(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['RestoreMySQLBackup'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
+export function RestorePostgresBackup(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['RestorePostgresBackup'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function RestoreS3Backup(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['RestoreS3Backup'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
@@ -116,6 +128,10 @@ export function TransferMongoDatabase(arg1, arg2, arg3, arg4, arg5, arg6, arg7, 
 
 export function TransferMySQLDatabase(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
   return window['go']['main']['App']['TransferMySQLDatabase'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+}
+
+export function TransferPostgresDatabase(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
+  return window['go']['main']['App']['TransferPostgresDatabase'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
 }
 
 export function UpdateGitSubmodules(arg1, arg2) {

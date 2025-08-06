@@ -1,4 +1,4 @@
-import { TestMySQLConnection } from '@/wailsjs/go/main/App';
+import { TestMySQLConnection } from '../../wailsjs/go/main/App';
 
 export interface MySQLServer {
   id: string;

@@ -290,10 +290,12 @@ const getDestinationServer = (): MongoServer | null => {
       port: clonedServer.value.port,
       user: clonedServer.value.user,
       password: clonedServer.value.password,
-      isDefault: false
+      isDefault: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
   } else {
-    return MongoServersManager.getServerById(selectedDestinationId.value);
+    return MongoServersManager.getServerById(selectedDestinationId.value) || null;
   }
 };
 

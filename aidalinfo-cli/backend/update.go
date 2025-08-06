@@ -9,23 +9,69 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
 const (
-	REPO_URL     = "https://github.com/aidalinfo/aidalinfo-devcli"
-	CURRENT_VERSION = "1.0.0"
+	REPO_URL        = "https://github.com/aidalinfo/aidalinfo-devcli"
+	CURRENT_VERSION = "v0.0.14"
 )
 
 type UpdateInfo struct {
-	CurrentVersion string `json:"currentVersion"`
-	LatestVersion  string `json:"latestVersion"`
+	CurrentVersion  string `json:"currentVersion"`
+	LatestVersion   string `json:"latestVersion"`
 	UpdateAvailable bool   `json:"updateAvailable"`
-	DownloadURL    string `json:"downloadUrl"`
+	DownloadURL     string `json:"downloadUrl"`
 }
 
 func GetCurrentVersion() string {
 	return CURRENT_VERSION
+}
+
+// compareVersions compare deux versions sémantiques
+// Retourne: 1 si v1 > v2, -1 si v1 < v2, 0 si v1 == v2
+func compareVersions(v1, v2 string) int {
+	// Supprimer le préfixe 'v' s'il existe
+	v1 = strings.TrimPrefix(v1, "v")
+	v2 = strings.TrimPrefix(v2, "v")
+
+	// Séparer par les points
+	parts1 := strings.Split(v1, ".")
+	parts2 := strings.Split(v2, ".")
+
+	// Comparer chaque partie numériquement
+	maxLen := len(parts1)
+	if len(parts2) > maxLen {
+		maxLen = len(parts2)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		var p1, p2 int
+		var err error
+
+		if i < len(parts1) {
+			p1, err = strconv.Atoi(parts1[i])
+			if err != nil {
+				p1 = 0 // Si ce n'est pas un nombre, traiter comme 0
+			}
+		}
+
+		if i < len(parts2) {
+			p2, err = strconv.Atoi(parts2[i])
+			if err != nil {
+				p2 = 0 // Si ce n'est pas un nombre, traiter comme 0
+			}
+		}
+
+		if p1 > p2 {
+			return 1
+		} else if p1 < p2 {
+			return -1
+		}
+	}
+
+	return 0 // Les versions sont égales
 }
 
 func CheckForUpdates() (*UpdateInfo, error) {
@@ -42,7 +88,8 @@ func CheckForUpdates() (*UpdateInfo, error) {
 			parts := strings.Split(tag, "refs/tags/")
 			if len(parts) == 2 {
 				version := strings.TrimSpace(parts[1])
-				if latestVersion == "" || version > latestVersion {
+				// Utiliser la comparaison de versions sémantiques
+				if latestVersion == "" || compareVersions(version, latestVersion) > 0 {
 					latestVersion = version
 				}
 			}
@@ -51,23 +98,23 @@ func CheckForUpdates() (*UpdateInfo, error) {
 
 	if latestVersion == "" {
 		return &UpdateInfo{
-			CurrentVersion: CURRENT_VERSION,
+			CurrentVersion:  CURRENT_VERSION,
 			UpdateAvailable: false,
 		}, nil
 	}
 
-	latestVersionClean := strings.TrimPrefix(latestVersion, "v")
-	currentVersionClean := strings.TrimPrefix(CURRENT_VERSION, "v")
-
 	arch := runtime.GOARCH
 	osName := runtime.GOOS
-	downloadURL := fmt.Sprintf("%s/releases/download/%s/aidalinfo-cli_%s_%s", 
+	downloadURL := fmt.Sprintf("%s/releases/download/%s/aidalinfo-cli_%s_%s",
 		REPO_URL, latestVersion, osName, arch)
+
+	// Une mise à jour est disponible si la version distante est plus récente que la version actuelle
+	updateAvailable := compareVersions(latestVersion, CURRENT_VERSION) > 0
 
 	return &UpdateInfo{
 		CurrentVersion:  CURRENT_VERSION,
 		LatestVersion:   latestVersion,
-		UpdateAvailable: latestVersionClean != currentVersionClean,
+		UpdateAvailable: updateAvailable,
 		DownloadURL:     downloadURL,
 	}, nil
 }
@@ -111,7 +158,7 @@ func PerformUpdate(tmpFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("erreur lors de la récupération du chemin de l'exécutable: %v", err)
 	}
-	
+
 	currentExe, err = filepath.EvalSymlinks(currentExe)
 	if err != nil {
 		return fmt.Errorf("erreur lors de la résolution du symlink: %v", err)
@@ -136,13 +183,13 @@ func PerformUpdate(tmpFilePath string) error {
 	}
 
 	os.Remove(backupPath)
-	
+
 	return nil
 }
 
 func GetLatestReleaseInfo() (map[string]interface{}, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/aidalinfo/aidalinfo-devcli/releases/latest")
-	
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
