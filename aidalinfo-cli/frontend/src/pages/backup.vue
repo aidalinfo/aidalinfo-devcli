@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { ListBackupsWithCreds, RestoreMongoBackup, RestoreMySQLBackup, RestoreS3Backup } from '../../wailsjs/go/main/App'
+import { ListBackupsWithCreds, RestoreMongoBackup, RestoreMySQLBackup, RestoreS3Backup, DownloadBackupToDirectory } from '../../wailsjs/go/main/App'
 import { backend } from '../../wailsjs/go/models'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'vue-sonner'
-import { Plus } from 'lucide-vue-next'
+import { Plus, Download } from 'lucide-vue-next'
 import MongoServerSelector from '@/components/MongoServerSelector.vue'
 import { MongoServersManager, getMongoConnectionParams } from '@/utils/mongoServers'
 import type { MongoServer } from '@/utils/mongoServers'
@@ -275,6 +275,33 @@ async function restoreS3() {
     toast.error('Erreur restauration S3 : ' + (e.message || e.toString()))
   }
 }
+
+// Fonction générique de téléchargement
+async function downloadBackup(file: backend.BackupInfo, type: 'mongo' | 'mysql' | 's3') {
+  const creds = getS3Credentials()
+  const current = getCurrentProject()
+  
+  // Configuration selon le type
+  const config = {
+    mongo: { path: current.mongo, label: 'MongoDB' },
+    mysql: { path: current.mysql, label: 'MySQL' },
+    s3: { path: current.bucket, label: 'S3' }
+  }
+  
+  const { path, label } = config[type]
+  const s3Path = path + file.name
+  
+  toast.info('Sélectionnez un dossier de destination...')
+  try {
+    const downloadPath = await DownloadBackupToDirectory(creds, s3Path, file.name)
+    toast.success(`Backup ${label} téléchargé avec succès dans : ${downloadPath}`)
+  } catch (e: any) {
+    if (e.message && e.message.includes('aucun dossier sélectionné')) {
+      return // L'utilisateur a annulé, pas d'erreur
+    }
+    toast.error(`Erreur téléchargement ${label} : ` + (e.message || e.toString()))
+  }
+}
 </script>
 
 <template>
@@ -319,7 +346,10 @@ async function restoreS3() {
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
               <TableCell class="text-right">
-                <Button size="icon" variant="ghost" @click="selectMongoServerForRestore(file)">
+                <Button size="icon" variant="ghost" @click="downloadBackup(file, 'mongo')" title="Télécharger">
+                  <Download class="w-5 h-5 text-blue-600" />
+                </Button>
+                <Button size="icon" variant="ghost" @click="selectMongoServerForRestore(file)" title="Restaurer">
                   <Plus class="w-5 h-5 text-primary" />
                 </Button>
               </TableCell>
@@ -359,7 +389,10 @@ async function restoreS3() {
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
               <TableCell class="text-right">
-                <Button size="icon" variant="ghost" @click="selectMySQLServerForRestore(file)">
+                <Button size="icon" variant="ghost" @click="downloadBackup(file, 'mysql')" title="Télécharger">
+                  <Download class="w-5 h-5 text-blue-600" />
+                </Button>
+                <Button size="icon" variant="ghost" @click="selectMySQLServerForRestore(file)" title="Restaurer">
                   <Plus class="w-5 h-5 text-primary" />
                 </Button>
               </TableCell>
@@ -399,7 +432,10 @@ async function restoreS3() {
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
               <TableCell class="text-right">
-                <Button size="icon" variant="ghost" @click="selectS3ServerForRestore(file)">
+                <Button size="icon" variant="ghost" @click="downloadBackup(file, 's3')" title="Télécharger">
+                  <Download class="w-5 h-5 text-blue-600" />
+                </Button>
+                <Button size="icon" variant="ghost" @click="selectS3ServerForRestore(file)" title="Restaurer">
                   <Plus class="w-5 h-5 text-primary" />
                 </Button>
               </TableCell>
