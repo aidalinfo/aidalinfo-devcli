@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -55,12 +56,11 @@ const savePath = () => {
 
 const scanSubmodules = async () => {
   if (!scanPath.value.trim()) {
-    error.value = 'Veuillez entrer un chemin à scanner'
+    toast.error('Veuillez entrer un chemin à scanner')
     return
   }
 
   loading.value = true
-  error.value = ''
   
   try {
     // Save path to cache
@@ -137,10 +137,11 @@ const scanSubmodules = async () => {
     }
     
     submodules.value = detailedSubmodules
+    toast.success(`Scan terminé: ${detailedSubmodules.length} submodules trouvés`)
     
   } catch (err) {
     console.error('Error scanning submodules:', err)
-    error.value = `Erreur lors du scan: ${err}`
+    toast.error(`Erreur lors du scan: ${err}`)
   } finally {
     loading.value = false
   }
@@ -193,9 +194,6 @@ const handleTagCreated = () => {
             >
               {{ loading ? 'Scan en cours...' : 'Scanner' }}
             </Button>
-          </div>
-          <div v-if="error" class="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-700">
-            {{ error }}
           </div>
         </CardContent>
       </Card>

@@ -82,6 +82,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -113,7 +114,7 @@ onMounted(() => {
 function saveCredentials() {
   localStorage.setItem('s3_access_key', accessKey.value)
   localStorage.setItem('s3_secret_key', secretKey.value)
-  alert('Clés S3 sauvegardées localement !')
+  toast.success('Clés S3 sauvegardées localement !')
 }
 
 function saveS3Advanced() {
@@ -123,6 +124,6 @@ function saveS3Advanced() {
   localStorage.setItem('s3_use_https', s3UseHttps.value)
   localStorage.setItem('s3local_access_key', s3LocalAccessKey.value)
   localStorage.setItem('s3local_secret_key', s3LocalSecretKey.value)
-  alert('Paramètres S3 avancés sauvegardés !')
+  toast.success('Paramètres S3 avancés sauvegardés !')
 }
 </script>

@@ -17,7 +17,7 @@ const npmInstall = ref(false)
 
 const scanSubmodules = async () => {
   if (!scanPath.value.trim()) {
-    error.value = 'Veuillez entrer un chemin à scanner'
+    toast.error('Veuillez entrer un chemin à scanner')
     return
   }
   loading.value = true
@@ -27,8 +27,9 @@ const scanSubmodules = async () => {
     const submodulePaths = await ListSubmodules(scanPath.value)
     const submoduleNames = await CleanSubmodules(submodulePaths)
     submodules.value = submodulePaths.map((path, i) => ({ name: submoduleNames[i], path }))
+    toast.success('Scan des submodules terminé')
   } catch (err) {
-    error.value = `Erreur lors du scan: ${err}`
+    toast.error(`Erreur lors du scan: ${err}`)
   } finally {
     loading.value = false
   }
@@ -54,11 +55,10 @@ const handleBranchesInputKeyup = (e: KeyboardEvent) => {
 
 const handleSetup = async () => {
   if (branches.value.length === 0) {
-    error.value = 'Ajoutez au moins une branche avant de lancer le setup.'
+    toast.error('Ajoutez au moins une branche avant de lancer le setup.')
     return
   }
   loading.value = true
-  error.value = ''
   try {
     await InstallSubmodules(scanPath.value || '.', branches.value)
     toast.success('Checkout des submodules terminé !')
@@ -69,7 +69,6 @@ const handleSetup = async () => {
     }
   } catch (err: any) {
     const msg = err?.message || err?.toString() || 'Erreur lors du setup'
-    error.value = msg
     toast.error(msg, { duration: 10000 })
   } finally {
     loading.value = false
@@ -94,9 +93,6 @@ const handleSetup = async () => {
         <Button @click="scanSubmodules" :disabled="loading || !scanPath.trim()">
           {{ loading ? 'Scan en cours...' : 'Scanner' }}
         </Button>
-      </div>
-      <div v-if="error" class="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700">
-        {{ error }}
       </div>
       <div v-if="submodules.length > 0">
         <div class="mb-4">
