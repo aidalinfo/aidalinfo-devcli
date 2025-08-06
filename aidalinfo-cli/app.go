@@ -138,3 +138,16 @@ func (a *App) RestoreMongoBackup(creds backend.S3Credentials, s3Path, mongoHost,
 func (a *App) RestoreS3Backup(cloudCreds backend.S3Credentials, localCreds backend.S3Credentials, s3Path, s3Host, s3Port, s3Region string, s3UseHttps bool) error {
 	return backend.RestoreS3Backup(a.ctx, cloudCreds, localCreds, s3Path, s3Host, s3Port, s3Region, s3UseHttps)
 }
+
+// Expose MongoDB transfer functions to frontend
+func (a *App) ListMongoDatabases(mongoHost, mongoPort, mongoUser, mongoPassword string) ([]string, error) {
+	return backend.ListMongoDatabases(a.ctx, mongoHost, mongoPort, mongoUser, mongoPassword)
+}
+
+func (a *App) TransferMongoDatabase(sourceHost, sourcePort, sourceUser, sourcePassword, destHost, destPort, destUser, destPassword, database string, dropExisting bool) error {
+	return backend.TransferMongoDatabase(a.ctx, sourceHost, sourcePort, sourceUser, sourcePassword, destHost, destPort, destUser, destPassword, database, dropExisting)
+}
+
+func (a *App) DumpMongoDatabase(mongoHost, mongoPort, mongoUser, mongoPassword, database string) (string, error) {
+	return backend.DumpMongoDatabase(a.ctx, mongoHost, mongoPort, mongoUser, mongoPassword, database)
+}

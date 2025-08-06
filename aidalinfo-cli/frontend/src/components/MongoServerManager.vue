@@ -65,6 +65,16 @@
                 </svg>
               </Button>
               <Button
+                @click="cloneServer(server)"
+                variant="outline"
+                size="sm"
+                title="Cloner et transférer"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+              </Button>
+              <Button
                 @click="editServer(server)"
                 variant="outline"
                 size="sm"
@@ -230,6 +240,14 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Modal de transfert de base de données -->
+    <MongoDatabaseTransfer 
+      v-if="sourceServerForTransfer"
+      :open="showTransferModal"
+      :source-server="sourceServerForTransfer"
+      @close="showTransferModal = false; sourceServerForTransfer = null"
+    />
   </div>
 </template>
 
@@ -243,10 +261,13 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import MongoDatabaseTransfer from './MongoDatabaseTransfer.vue';
 
 const servers = ref<MongoServer[]>([]);
 const showAddModal = ref(false);
 const showImportModal = ref(false);
+const showTransferModal = ref(false);
+const sourceServerForTransfer = ref<MongoServer | null>(null);
 const editingServer = ref<MongoServer | null>(null);
 const serverToDelete = ref<MongoServer | null>(null);
 const importData = ref('');
@@ -335,6 +356,11 @@ const testConnection = async (server: MongoServer) => {
   } else {
     toast.error(`Échec de la connexion: ${result.message}`);
   }
+};
+
+const cloneServer = (server: MongoServer) => {
+  sourceServerForTransfer.value = server;
+  showTransferModal.value = true;
 };
 
 const exportServers = () => {
