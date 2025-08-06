@@ -92,15 +92,6 @@ func GitStatus(submodule string) string {
 	return string(output)
 }
 
-// Fonction pour obtenir la branche actuelle du sous-module
-func GetCurrentBranch(path string) string {
-	cmd := exec.Command("git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Sprintf("Erreur : %s", err.Error())
-	}
-	return strings.TrimSpace(string(output))
-}
 
 // Fonction pour obtenir la liste des branches disponibles
 func GetBranches(path string) []string {
@@ -314,29 +305,6 @@ func changeBranche(repoPath, branch string) error {
 	return nil
 }
 
-func GitUpdateAction(submodules []string) error {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("erreur lors de la récupération du répertoire courant: %v", err)
-	}
-
-	for _, submodule := range submodules {
-		fmt.Printf("📦 Mise à jour git dans %s\n", submodule)
-		if err := os.Chdir(submodule); err != nil {
-			return fmt.Errorf("erreur lors du changement de répertoire: %v", err)
-		}
-
-		if err := execCommand("git", "pull"); err != nil {
-			return err
-		}
-
-		if err := os.Chdir(currentDir); err != nil {
-			return fmt.Errorf("erreur lors du retour au répertoire parent: %v", err)
-		}
-	}
-
-	return nil
-}
 
 type TagsResult struct {
 	VTags  []string `json:"vTags"`

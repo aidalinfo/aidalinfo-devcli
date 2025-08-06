@@ -58,8 +58,8 @@ export function ListSubmodules(arg1) {
   return window['go']['main']['App']['ListSubmodules'](arg1);
 }
 
-export function NpmUpdateAction() {
-  return window['go']['main']['App']['NpmUpdateAction']();
+export function NpmUpdateAction(arg1) {
+  return window['go']['main']['App']['NpmUpdateAction'](arg1);
 }
 
 export function RestoreMongoBackup(arg1, arg2, arg3, arg4, arg5, arg6) {
@@ -74,6 +74,6 @@ export function TagAction(arg1, arg2) {
   return window['go']['main']['App']['TagAction'](arg1, arg2);
 }
 
-export function UpdateGitSubmodules(arg1) {
-  return window['go']['main']['App']['UpdateGitSubmodules'](arg1);
+export function UpdateGitSubmodules(arg1, arg2) {
+  return window['go']['main']['App']['UpdateGitSubmodules'](arg1, arg2);
 }

@@ -47,7 +47,8 @@ func (a *App) GitStatus(submodule string) string {
 }
 
 func (a *App) GetCurrentBranch(path string) string {
-	return backend.GetCurrentBranch(path)
+	branch, _ := backend.GetCurrentBranch(path)
+	return branch
 }
 
 func (a *App) GetBranches(path string) []string {
@@ -67,8 +68,8 @@ func (a *App) InstallNpmDependencies(path string, all bool) error {
 	return backend.NpmAction(path, all)
 }
 
-func (a *App) UpdateGitSubmodules(submodules []string) error {
-	return backend.GitUpdateAction(submodules)
+func (a *App) UpdateGitSubmodules(path string, submodules []string) error {
+	return backend.GitUpdateAction(path, submodules)
 }
 
 func (a *App) GetDefaultBranch() (string, error) {
@@ -88,8 +89,8 @@ func (a *App) TagAction(version, message string) error {
 	return backend.TagAction(version, message)
 }
 
-func (a *App) NpmUpdateAction() error {
-	return backend.NpmUpdateAction()
+func (a *App) NpmUpdateAction(path string) error {
+	return backend.NpmUpdateAction(path)
 }
 
 // Expose DownloadBackupWithCreds to frontend
