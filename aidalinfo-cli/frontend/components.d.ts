@@ -36,6 +36,8 @@ declare module 'vue' {
     HelloWorld: typeof import('./src/components/HelloWorld.vue')['default']
     Input: typeof import('./src/components/ui/input/Input.vue')['default']
     Label: typeof import('./src/components/ui/label/Label.vue')['default']
+    MongoServerManager: typeof import('./src/components/MongoServerManager.vue')['default']
+    MongoServerSelector: typeof import('./src/components/MongoServerSelector.vue')['default']
     Navigation: typeof import('./src/components/Navigation.vue')['default']
     Popover: typeof import('./src/components/ui/popover/Popover.vue')['default']
     PopoverAnchor: typeof import('./src/components/ui/popover/PopoverAnchor.vue')['default']
@@ -106,5 +108,6 @@ declare module 'vue' {
     TooltipContent: typeof import('./src/components/ui/tooltip/TooltipContent.vue')['default']
     TooltipProvider: typeof import('./src/components/ui/tooltip/TooltipProvider.vue')['default']
     TooltipTrigger: typeof import('./src/components/ui/tooltip/TooltipTrigger.vue')['default']
+    UpdateDialog: typeof import('./src/components/UpdateDialog.vue')['default']
   }
 }

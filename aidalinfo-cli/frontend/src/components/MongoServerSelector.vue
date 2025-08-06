@@ -1,61 +1,84 @@
 <template>
-  <div class="mongo-server-selector">
-    <div v-if="servers.length === 0" class="no-servers">
-      <p>No MongoDB servers configured</p>
-      <router-link to="/settings" class="btn btn-primary">
-        Configure Servers
-      </router-link>
+  <div class="space-y-4">
+    <!-- État vide -->
+    <div v-if="servers.length === 0" class="text-center py-8 bg-muted/50 rounded-lg">
+      <div class="mx-auto w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-3">
+        <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+        </svg>
+      </div>
+      <p class="text-sm text-muted-foreground mb-3">Aucun serveur MongoDB configuré</p>
+      <Button size="sm" as="router-link" to="/settings">
+        Configurer les serveurs
+      </Button>
     </div>
 
-    <div v-else>
-      <div class="selector-header">
-        <label for="server-select">Select MongoDB Server:</label>
-        <router-link to="/settings" class="config-link" title="Configure servers">
-          <i class="fas fa-cog"></i>
-        </router-link>
+    <!-- Sélecteur de serveur -->
+    <div v-else class="space-y-4">
+      <div class="flex justify-between items-center">
+        <Label for="server-select" class="text-sm font-medium">Serveur MongoDB :</Label>
+        <Button variant="ghost" size="sm" as="router-link" to="/settings" title="Configurer les serveurs">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </Button>
       </div>
 
-      <select
-        id="server-select"
-        v-model="selectedServerId"
-        @change="onServerChange"
-        class="server-select"
-      >
-        <option value="" disabled>Choose a server...</option>
-        <option
-          v-for="server in servers"
-          :key="server.id"
-          :value="server.id"
-        >
-          {{ server.name }}
-          {{ server.isDefault ? '(Default)' : '' }}
-          - {{ server.host }}:{{ server.port }}
-        </option>
-      </select>
+      <Select v-model="selectedServerId" @update:model-value="onServerChange">
+        <SelectTrigger>
+          <SelectValue placeholder="Choisir un serveur..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem
+            v-for="server in servers"
+            :key="server.id"
+            :value="server.id"
+          >
+            {{ server.name }}
+            {{ server.isDefault ? '(Par défaut)' : '' }}
+            - {{ server.host }}:{{ server.port }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
 
-      <div v-if="selectedServer" class="server-details">
-        <div class="detail-row">
-          <span class="label">Host:</span>
-          <span class="value">{{ selectedServer.host }}</span>
+      <!-- Détails du serveur sélectionné -->
+      <div v-if="selectedServer" class="bg-muted/50 rounded-lg p-4 space-y-3">
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div class="space-y-1">
+            <span class="font-medium text-muted-foreground">Hôte</span>
+            <p class="font-mono">{{ selectedServer.host }}</p>
+          </div>
+          <div class="space-y-1">
+            <span class="font-medium text-muted-foreground">Port</span>
+            <p class="font-mono">{{ selectedServer.port }}</p>
+          </div>
+          <div v-if="selectedServer.user" class="space-y-1 col-span-2">
+            <span class="font-medium text-muted-foreground">Utilisateur</span>
+            <p class="font-mono">{{ selectedServer.user }}</p>
+          </div>
         </div>
-        <div class="detail-row">
-          <span class="label">Port:</span>
-          <span class="value">{{ selectedServer.port }}</span>
-        </div>
-        <div class="detail-row" v-if="selectedServer.user">
-          <span class="label">User:</span>
-          <span class="value">{{ selectedServer.user }}</span>
-        </div>
-        <div v-if="showConnectionStatus" class="connection-status">
-          <span v-if="connectionTested === null" class="testing">
-            <i class="fas fa-spinner fa-spin"></i> Testing connection...
-          </span>
-          <span v-else-if="connectionTested" class="success">
-            <i class="fas fa-check-circle"></i> Connection successful
-          </span>
-          <span v-else class="error">
-            <i class="fas fa-times-circle"></i> Connection failed
-          </span>
+        
+        <!-- Statut de connexion -->
+        <div v-if="showConnectionStatus" class="pt-3 border-t">
+          <div v-if="connectionTested === null" class="flex items-center gap-2 text-blue-600">
+            <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            <span class="text-sm">Test de connexion en cours...</span>
+          </div>
+          <div v-else-if="connectionTested" class="flex items-center gap-2 text-green-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-sm">Connexion réussie</span>
+          </div>
+          <div v-else class="flex items-center gap-2 text-red-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-sm">Échec de la connexion</span>
+          </div>
         </div>
       </div>
     </div>
@@ -65,6 +88,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { MongoServersManager, type MongoServer } from '@/utils/mongoServers';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const props = defineProps<{
   modelValue?: string;
@@ -138,130 +164,3 @@ defineExpose({
 });
 </script>
 
-<style scoped>
-.mongo-server-selector {
-  margin: 20px 0;
-}
-
-.no-servers {
-  text-align: center;
-  padding: 20px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.no-servers p {
-  color: #6c757d;
-  margin-bottom: 16px;
-}
-
-.selector-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.selector-header label {
-  font-weight: 500;
-  color: #495057;
-}
-
-.config-link {
-  color: #6c757d;
-  transition: color 0.2s;
-}
-
-.config-link:hover {
-  color: #007bff;
-}
-
-.server-select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 14px;
-  background: white;
-  cursor: pointer;
-}
-
-.server-select:focus {
-  outline: none;
-  border-color: #80bdff;
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-}
-
-.server-details {
-  margin-top: 16px;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.detail-row {
-  display: flex;
-  margin-bottom: 8px;
-}
-
-.detail-row:last-child {
-  margin-bottom: 0;
-}
-
-.detail-row .label {
-  font-weight: 500;
-  margin-right: 8px;
-  min-width: 60px;
-  color: #6c757d;
-}
-
-.detail-row .value {
-  color: #495057;
-}
-
-.connection-status {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #dee2e6;
-}
-
-.connection-status span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.connection-status .testing {
-  color: #007bff;
-}
-
-.connection-status .success {
-  color: #28a745;
-}
-
-.connection-status .error {
-  color: #dc3545;
-}
-
-.btn {
-  display: inline-block;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #0056b3;
-}
-</style>
