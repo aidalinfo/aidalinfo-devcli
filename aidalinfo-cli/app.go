@@ -172,3 +172,20 @@ func (a *App) RestoreMySQLBackup(creds backend.S3Credentials, s3Path, mysqlHost,
 func (a *App) TestMySQLConnection(mysqlHost, mysqlPort, mysqlUser, mysqlPassword string) error {
 	return backend.TestMySQLConnection(a.ctx, mysqlHost, mysqlPort, mysqlUser, mysqlPassword)
 }
+
+// Expose PostgreSQL functions to frontend
+func (a *App) ListPostgresDatabases(pgHost, pgPort, pgUser, pgPassword string) ([]string, error) {
+	return backend.ListPostgresDatabases(a.ctx, pgHost, pgPort, pgUser, pgPassword)
+}
+
+func (a *App) TransferPostgresDatabase(sourceHost, sourcePort, sourceUser, sourcePassword, destHost, destPort, destUser, destPassword, database string, dropExisting bool) error {
+	return backend.TransferPostgresDatabase(a.ctx, sourceHost, sourcePort, sourceUser, sourcePassword, destHost, destPort, destUser, destPassword, database, dropExisting)
+}
+
+func (a *App) DumpPostgresDatabase(pgHost, pgPort, pgUser, pgPassword, database string) (string, error) {
+	return backend.DumpPostgresDatabase(a.ctx, pgHost, pgPort, pgUser, pgPassword, database)
+}
+
+func (a *App) RestorePostgresBackup(creds backend.S3Credentials, s3Path, pgHost, pgPort, pgUser, pgPassword, pgDatabase string) error {
+	return backend.RestorePostgresBackup(a.ctx, creds, s3Path, pgHost, pgPort, pgUser, pgPassword, pgDatabase)
+}

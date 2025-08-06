@@ -854,3 +854,326 @@ func ListMongoDatabases(ctx context.Context, mongoHost, mongoPort, mongoUser, mo
 	
 	return databases, nil
 }
+
+// RestorePostgresBackup télécharge un backup S3 et le restaure dans PostgreSQL
+func RestorePostgresBackup(ctx context.Context, creds S3Credentials, s3Path string, pgHost, pgPort, pgUser, pgPassword, pgDatabase string) error {
+	bucket := "backup-global"
+	objectName := s3Path
+	awsCfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(S3Region),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
+	)
+	if err != nil {
+		return fmt.Errorf("erreur chargement config AWS: %v", err)
+	}
+	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.UsePathStyle = true
+	})
+	presignedURL, err := generatePresignedURL(ctx, client, bucket, objectName)
+	if err != nil {
+		return err
+	}
+
+	// Récupère la taille du fichier pour la progression
+	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &bucket, Key: &objectName})
+	var totalSize int64 = 0
+	if err == nil && head.ContentLength != nil {
+		totalSize = *head.ContentLength
+		LogToFrontend("info", fmt.Sprintf("Taille du backup à télécharger: %.2f MB", float64(totalSize)/(1024*1024)))
+	}
+
+	respBody, err := downloadWithRetry(presignedURL, 3, 30*time.Minute)
+	if err != nil {
+		return fmt.Errorf("erreur téléchargement HTTP: %v", err)
+	}
+	defer respBody.Close()
+
+	tmpDir, err := getUserTmpDir()
+	if err != nil {
+		return err
+	}
+	tmpFile, err := os.CreateTemp(tmpDir, "postgres-backup-*.sql.gz")
+	if err != nil {
+		return fmt.Errorf("erreur création fichier temporaire: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	// Progression du téléchargement
+	progressReader := &progressReaderWithLog{
+		r:     respBody,
+		total: totalSize,
+	}
+	LogToFrontend("info", "Début du téléchargement du backup PostgreSQL...")
+	_, err = io.Copy(tmpFile, progressReader)
+	if err != nil {
+		return fmt.Errorf("erreur écriture fichier: %v", err)
+	}
+	LogToFrontend("success", "Téléchargement du backup PostgreSQL terminé.")
+
+	LogToFrontend("debug", fmt.Sprintf("pgHost=%s, pgPort=%s, pgUser=%s, pgDatabase=%s", pgHost, pgPort, pgUser, pgDatabase))
+
+	// Définir PGPASSWORD dans l'environnement
+	env := os.Environ()
+	if pgPassword != "" {
+		env = append(env, fmt.Sprintf("PGPASSWORD=%s", pgPassword))
+	}
+
+	// Décompresser et restaurer avec pg_restore ou psql selon le format
+	LogToFrontend("info", "Début de la restauration PostgreSQL...")
+	
+	// D'abord, décompresser le fichier pour déterminer son format
+	cmd := exec.Command("gunzip", "-c", tmpFile.Name())
+	cmd.Env = env
+	unzippedData, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("erreur décompression: %v", err)
+	}
+
+	// Créer un fichier temporaire pour les données décompressées
+	tmpUnzipped, err := os.CreateTemp(tmpDir, "postgres-backup-*.sql")
+	if err != nil {
+		return fmt.Errorf("erreur création fichier temporaire décompressé: %v", err)
+	}
+	defer os.Remove(tmpUnzipped.Name())
+	
+	if _, err := tmpUnzipped.Write(unzippedData); err != nil {
+		tmpUnzipped.Close()
+		return fmt.Errorf("erreur écriture fichier décompressé: %v", err)
+	}
+	tmpUnzipped.Close()
+
+	// Vérifier si c'est un dump custom format ou SQL plain text
+	fileCmd := exec.Command("file", tmpUnzipped.Name())
+	fileOutput, _ := fileCmd.Output()
+	fileType := string(fileOutput)
+
+	var restoreCmd *exec.Cmd
+	if strings.Contains(fileType, "PostgreSQL") && strings.Contains(fileType, "custom") {
+		// Format custom, utiliser pg_restore
+		restoreCmd = exec.Command("pg_restore",
+			"-h", pgHost,
+			"-p", pgPort,
+			"-U", pgUser,
+			"-d", pgDatabase,
+			"--clean",
+			"--if-exists",
+			"--no-owner",
+			"--no-privileges",
+			tmpUnzipped.Name())
+	} else {
+		// Format SQL plain text, utiliser psql
+		restoreCmd = exec.Command("psql",
+			"-h", pgHost,
+			"-p", pgPort,
+			"-U", pgUser,
+			"-d", pgDatabase,
+			"-f", tmpUnzipped.Name())
+	}
+
+	restoreCmd.Env = env
+	restoreCmd.Stdout = os.Stdout
+	restoreCmd.Stderr = os.Stderr
+	
+	if err := restoreCmd.Run(); err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur restauration PostgreSQL: %v", err))
+		return fmt.Errorf("erreur restauration PostgreSQL: %v", err)
+	}
+
+	LogToFrontend("success", "Restauration PostgreSQL terminée avec succès.")
+	return nil
+}
+
+// DumpPostgresDatabase crée un dump d'une base PostgreSQL
+func DumpPostgresDatabase(ctx context.Context, pgHost, pgPort, pgUser, pgPassword, database string) (string, error) {
+	tmpDir, err := getUserTmpDir()
+	if err != nil {
+		return "", err
+	}
+
+	// Créer un fichier temporaire pour le dump
+	tmpFile, err := os.CreateTemp(tmpDir, fmt.Sprintf("postgres-dump-%s-*.sql.gz", database))
+	if err != nil {
+		return "", fmt.Errorf("erreur création fichier temporaire: %v", err)
+	}
+	tmpFilePath := tmpFile.Name()
+	tmpFile.Close()
+
+	// Définir PGPASSWORD dans l'environnement
+	env := os.Environ()
+	if pgPassword != "" {
+		env = append(env, fmt.Sprintf("PGPASSWORD=%s", pgPassword))
+	}
+
+	LogToFrontend("info", fmt.Sprintf("Création du dump de la base %s...", database))
+	
+	// Utiliser pg_dump avec compression
+	dumpCmd := exec.Command("pg_dump",
+		"-h", pgHost,
+		"-p", pgPort,
+		"-U", pgUser,
+		"-d", database,
+		"--clean",
+		"--if-exists",
+		"--no-owner",
+		"--no-privileges",
+		"-Z", "9") // Compression maximale
+	
+	dumpCmd.Env = env
+	dumpCmd.Stderr = os.Stderr
+
+	// Récupérer la sortie de pg_dump
+	dumpOutput, err := dumpCmd.Output()
+	if err != nil {
+		os.Remove(tmpFilePath)
+		LogToFrontend("error", fmt.Sprintf("Erreur pg_dump: %v", err))
+		return "", fmt.Errorf("erreur pg_dump: %v", err)
+	}
+
+	// Compresser avec gzip
+	gzipCmd := exec.Command("gzip", "-9")
+	gzipCmd.Stdin = strings.NewReader(string(dumpOutput))
+	
+	outFile, err := os.Create(tmpFilePath)
+	if err != nil {
+		return "", fmt.Errorf("erreur création fichier de sortie: %v", err)
+	}
+	defer outFile.Close()
+	
+	gzipCmd.Stdout = outFile
+	gzipCmd.Stderr = os.Stderr
+	
+	if err := gzipCmd.Run(); err != nil {
+		os.Remove(tmpFilePath)
+		LogToFrontend("error", fmt.Sprintf("Erreur compression gzip: %v", err))
+		return "", fmt.Errorf("erreur compression gzip: %v", err)
+	}
+
+	LogToFrontend("success", fmt.Sprintf("Dump de %s créé avec succès", database))
+	return tmpFilePath, nil
+}
+
+// TransferPostgresDatabase transfère une base de données entre deux serveurs PostgreSQL
+func TransferPostgresDatabase(ctx context.Context, sourceHost, sourcePort, sourceUser, sourcePassword,
+	destHost, destPort, destUser, destPassword, database string, dropExisting bool) error {
+
+	LogToFrontend("info", fmt.Sprintf("Début du transfert de la base %s", database))
+
+	// Étape 1: Créer le dump de la source
+	dumpFile, err := DumpPostgresDatabase(ctx, sourceHost, sourcePort, sourceUser, sourcePassword, database)
+	if err != nil {
+		return fmt.Errorf("erreur création dump: %v", err)
+	}
+	defer os.Remove(dumpFile)
+
+	// Étape 2: Décompresser le dump
+	tmpDir, err := getUserTmpDir()
+	if err != nil {
+		return err
+	}
+	
+	tmpUnzipped, err := os.CreateTemp(tmpDir, "postgres-transfer-*.sql")
+	if err != nil {
+		return fmt.Errorf("erreur création fichier temporaire: %v", err)
+	}
+	defer os.Remove(tmpUnzipped.Name())
+	tmpUnzipped.Close()
+
+	// Décompresser
+	cmd := exec.Command("gunzip", "-c", dumpFile)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("erreur décompression: %v", err)
+	}
+
+	if err := os.WriteFile(tmpUnzipped.Name(), output, 0644); err != nil {
+		return fmt.Errorf("erreur écriture fichier décompressé: %v", err)
+	}
+
+	// Étape 3: Créer la base de données de destination si elle n'existe pas
+	env := os.Environ()
+	if destPassword != "" {
+		env = append(env, fmt.Sprintf("PGPASSWORD=%s", destPassword))
+	}
+
+	if dropExisting {
+		// Supprimer la base si elle existe
+		dropCmd := exec.Command("psql",
+			"-h", destHost,
+			"-p", destPort,
+			"-U", destUser,
+			"-d", "postgres",
+			"-c", fmt.Sprintf("DROP DATABASE IF EXISTS %s", database))
+		dropCmd.Env = env
+		dropCmd.Run() // Ignorer l'erreur si la base n'existe pas
+	}
+
+	// Créer la base de données
+	createCmd := exec.Command("psql",
+		"-h", destHost,
+		"-p", destPort,
+		"-U", destUser,
+		"-d", "postgres",
+		"-c", fmt.Sprintf("CREATE DATABASE %s", database))
+	createCmd.Env = env
+	createCmd.Run() // Ignorer l'erreur si la base existe déjà
+
+	// Étape 4: Restaurer sur la destination
+	LogToFrontend("info", fmt.Sprintf("Restauration de %s sur le serveur de destination...", database))
+	restoreCmd := exec.Command("psql",
+		"-h", destHost,
+		"-p", destPort,
+		"-U", destUser,
+		"-d", database,
+		"-f", tmpUnzipped.Name())
+	
+	restoreCmd.Env = env
+	restoreCmd.Stdout = os.Stdout
+	restoreCmd.Stderr = os.Stderr
+
+	if err := restoreCmd.Run(); err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur restauration PostgreSQL: %v", err))
+		return fmt.Errorf("erreur restauration PostgreSQL: %v", err)
+	}
+
+	LogToFrontend("success", fmt.Sprintf("Transfert de %s terminé avec succès", database))
+	return nil
+}
+
+// ListPostgresDatabases liste les bases de données disponibles sur un serveur PostgreSQL
+func ListPostgresDatabases(ctx context.Context, pgHost, pgPort, pgUser, pgPassword string) ([]string, error) {
+	// Définir PGPASSWORD dans l'environnement
+	env := os.Environ()
+	if pgPassword != "" {
+		env = append(env, fmt.Sprintf("PGPASSWORD=%s", pgPassword))
+	}
+
+	// Utiliser psql pour lister les bases
+	cmd := exec.Command("psql",
+		"-h", pgHost,
+		"-p", pgPort,
+		"-U", pgUser,
+		"-d", "postgres",
+		"-t",
+		"-c", "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres')")
+	
+	cmd.Env = env
+	output, err := cmd.Output()
+	if err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur listing databases PostgreSQL: %v", err))
+		return nil, fmt.Errorf("erreur listing databases PostgreSQL: %v", err)
+	}
+
+	// Parser la sortie pour obtenir la liste des bases
+	lines := strings.Split(string(output), "\n")
+	var databases []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			databases = append(databases, line)
+		}
+	}
+
+	return databases, nil
+}
