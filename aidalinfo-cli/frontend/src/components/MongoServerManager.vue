@@ -236,7 +236,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { MongoServersManager, type MongoServer } from '@/utils/mongoServers';
-import { showNotification } from '@/utils/notifications';
+import { toast } from 'vue-sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -298,11 +298,11 @@ const saveServer = () => {
   if (editingServer.value) {
     // Update existing server
     MongoServersManager.updateServer(editingServer.value.id, formData.value);
-    showNotification('Server updated successfully', 'success');
+    toast.success('Serveur mis à jour avec succès');
   } else {
     // Add new server
     MongoServersManager.addServer(formData.value);
-    showNotification('Server added successfully', 'success');
+    toast.success('Serveur ajouté avec succès');
   }
   
   loadServers();
@@ -312,7 +312,7 @@ const saveServer = () => {
 const setAsDefault = (id: string) => {
   MongoServersManager.setDefaultServer(id);
   loadServers();
-  showNotification('Default server updated', 'success');
+  toast.success('Serveur par défaut mis à jour');
 };
 
 const confirmDelete = (server: MongoServer) => {
@@ -323,17 +323,18 @@ const deleteServer = () => {
   if (serverToDelete.value) {
     MongoServersManager.deleteServer(serverToDelete.value.id);
     loadServers();
-    showNotification('Server deleted successfully', 'success');
+    toast.success('Serveur supprimé avec succès');
     serverToDelete.value = null;
   }
 };
 
 const testConnection = async (server: MongoServer) => {
   const result = await MongoServersManager.testConnection(server);
-  showNotification(
-    result.success ? 'Connection successful' : `Connection failed: ${result.message}`,
-    result.success ? 'success' : 'error'
-  );
+  if (result.success) {
+    toast.success('Connexion réussie');
+  } else {
+    toast.error(`Échec de la connexion: ${result.message}`);
+  }
 };
 
 const exportServers = () => {
@@ -345,18 +346,18 @@ const exportServers = () => {
   a.download = `mongodb-servers-${new Date().toISOString().split('T')[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  showNotification('Configuration exported successfully', 'success');
+  toast.success('Configuration exportée avec succès');
 };
 
 const importServers = () => {
   const result = MongoServersManager.importServers(importData.value, replaceOnImport.value);
   if (result.success) {
-    showNotification(result.message, 'success');
+    toast.success(result.message);
     loadServers();
     showImportModal.value = false;
     importData.value = '';
   } else {
-    showNotification(result.message, 'error');
+    toast.error(result.message);
   }
 };
 

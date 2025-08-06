@@ -22,12 +22,16 @@
         </div>
       </div>
     </div>
+    <Toaster />
   </SidebarProvider>
 </template>
 
 <script setup lang="ts">
 import Navigation from '@/components/Navigation.vue'
+import Action from '@/components/Action.vue'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { Toaster } from '@/components/ui/sonner'
+import 'vue-sonner/style.css'
 </script>
 
 <style>
