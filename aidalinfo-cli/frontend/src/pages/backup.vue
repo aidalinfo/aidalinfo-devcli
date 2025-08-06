@@ -22,6 +22,7 @@ import { Plus } from 'lucide-vue-next'
 
 const PROJECTS = [
   { label: 'Sat&Lease V2', value: 'Sat&LeaseV2', mongo: 'backup/prod-sateleasev2/mongo/', bucket: 'backup/prod-sateleasev2/bucket/' },
+  { label: 'LRD (Le Rédacteur)', value: 'LRD', mongo: 'backup/leredacteur/mongo/', bucket: 'backup/leredacteur/bucket/' },
   // Ajoute ici d'autres projets si besoin
 ]
 
