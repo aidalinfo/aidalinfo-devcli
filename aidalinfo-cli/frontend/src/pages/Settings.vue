@@ -23,7 +23,7 @@
     </CardContent>
   </Card>
 
-  <Card class="mx-5 mt-10 mb-10">
+  <Card class="mx-5 mt-10">
     <CardHeader>
       <CardTitle>Serveurs MySQL</CardTitle>
       <CardDescription>
@@ -34,11 +34,24 @@
       <MySQLServerManager />
     </CardContent>
   </Card>
+
+  <Card class="mx-5 mt-10 mb-10">
+    <CardHeader>
+      <CardTitle>Serveurs PostgreSQL</CardTitle>
+      <CardDescription>
+        Gérez vos différents serveurs PostgreSQL pour la restauration et les dumps.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <PostgresServerManager />
+    </CardContent>
+  </Card>
 </template>
 
 <script setup lang="ts">
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import MongoServerManager from '@/components/MongoServerManager.vue'
 import MySQLServerManager from '@/components/MySQLServerManager.vue'
+import PostgresServerManager from '@/components/PostgresServerManager.vue'
 import S3ServerManager from '@/components/S3ServerManager.vue'
 </script>
