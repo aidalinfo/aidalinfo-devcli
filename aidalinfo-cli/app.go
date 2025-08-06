@@ -98,6 +98,30 @@ func (a *App) DownloadBackupWithCreds(creds backend.S3Credentials, s3Path, destP
 	return backend.DownloadBackupWithCreds(a.ctx, creds, s3Path, destPath)
 }
 
+// Update operations
+func (a *App) GetCurrentVersion() string {
+	return backend.GetCurrentVersion()
+}
+
+func (a *App) CheckForUpdates() (*backend.UpdateInfo, error) {
+	return backend.CheckForUpdates()
+}
+
+func (a *App) PerformUpdate(downloadURL string) error {
+	tmpFile, err := backend.DownloadUpdate(downloadURL)
+	if err != nil {
+		return err
+	}
+	
+	err = backend.PerformUpdate(tmpFile)
+	if err != nil {
+		return err
+	}
+	
+	runtime.EventsEmit(a.ctx, "update:complete")
+	return nil
+}
+
 // Expose BackupInfo to frontend
 func (a *App) ListBackupsWithCreds(creds backend.S3Credentials, s3Dir string) ([]backend.BackupInfo, error) {
 	return backend.ListBackupsWithCreds(a.ctx, creds, s3Dir)
