@@ -22,6 +22,9 @@ import { Plus } from 'lucide-vue-next'
 import MongoServerSelector from '@/components/MongoServerSelector.vue'
 import { MongoServersManager, getMongoConnectionParams } from '@/utils/mongoServers'
 import type { MongoServer } from '@/utils/mongoServers'
+import S3ServerSelector from '@/components/S3ServerSelector.vue'
+import { S3ServersManager, getS3ConnectionParams } from '@/utils/s3Servers'
+import type { S3Server } from '@/utils/s3Servers'
 
 const PROJECTS = [
   { label: 'Sat&Lease V2', value: 'Sat&LeaseV2', mongo: 'backup/prod-sateleasev2/mongo/', bucket: 'backup/prod-sateleasev2/bucket/' },
@@ -46,6 +49,11 @@ const bucketTotalPages = computed(() => Math.ceil(bucketBackups.value.length / P
 const selectedMongoServerId = ref<string>('')
 const showMongoServerModal = ref(false)
 const pendingMongoRestore = ref<backend.BackupInfo | null>(null)
+
+// Pour stocker le serveur S3 sélectionné
+const selectedS3ServerId = ref<string>('')
+const showS3ServerModal = ref(false)
+const pendingS3Restore = ref<backend.BackupInfo | null>(null)
 
 const pagedMongoBackups = computed(() => {
   const start = (mongoPage.value - 1) * PAGE_SIZE
@@ -75,6 +83,15 @@ function getCurrentProject() {
 }
 
 function getS3Credentials(): backend.S3Credentials {
+  // Utiliser le serveur S3 par défaut pour la récupération des backups
+  const defaultServer = S3ServersManager.getDefaultServer()
+  if (defaultServer) {
+    return new backend.S3Credentials({
+      accessKey: defaultServer.accessKey,
+      secretKey: defaultServer.secretKey
+    })
+  }
+  // Fallback sur les anciennes clés si pas de serveur configuré
   return new backend.S3Credentials({
     accessKey: localStorage.getItem('s3_access_key') || '',
     secretKey: localStorage.getItem('s3_secret_key') || ''
@@ -144,32 +161,46 @@ async function restoreMongo() {
   }
 }
 
-async function restoreS3(file: backend.BackupInfo) {
+function selectS3ServerForRestore(file: backend.BackupInfo) {
+  pendingS3Restore.value = file
+  showS3ServerModal.value = true
+}
+
+async function restoreS3() {
+  if (!pendingS3Restore.value || !selectedS3ServerId.value) {
+    toast.error('Veuillez sélectionner un serveur S3/MinIO')
+    return
+  }
+  
+  const server = S3ServersManager.getServer(selectedS3ServerId.value)
+  if (!server) {
+    toast.error('Serveur S3/MinIO introuvable')
+    return
+  }
+  
   const cloudCreds = getS3Credentials()
   const current = getCurrentProject()
-  // Récupère les paramètres S3 local depuis localStorage
-  const s3Host = localStorage.getItem('s3_host') || 'localhost'
-  const s3Port = localStorage.getItem('s3_port') || '9000'
-  const s3Region = localStorage.getItem('s3_region') || 'fr-par'
-  const s3UseHttps = localStorage.getItem('s3_use_https') === 'true'
-  const s3LocalAccessKey = localStorage.getItem('s3local_access_key') || ''
-  const s3LocalSecretKey = localStorage.getItem('s3local_secret_key') || ''
-  const localCreds = { accessKey: s3LocalAccessKey, secretKey: s3LocalSecretKey }
-  toast.info('Restauration S3 local en cours...')
+  const { host, port, accessKey, secretKey, region, useHttps } = getS3ConnectionParams(server)
+  const localCreds = { accessKey, secretKey }
+  
+  toast.info(`Restauration S3 sur ${server.name} en cours...`)
   try {
     // @ts-ignore
     await RestoreS3Backup(
       cloudCreds,
       localCreds,
-      current.bucket + file.name,
-      s3Host,
-      s3Port,
-      s3Region,
-      s3UseHttps
+      current.bucket + pendingS3Restore.value.name,
+      host,
+      port,
+      region,
+      useHttps
     )
-    toast.success('Restauration S3 local terminée avec succès !')
+    toast.success(`Restauration S3 sur ${server.name} terminée avec succès !`)
+    showS3ServerModal.value = false
+    pendingS3Restore.value = null
+    selectedS3ServerId.value = ''
   } catch (e: any) {
-    toast.error('Erreur restauration S3 local : ' + (e.message || e.toString()))
+    toast.error('Erreur restauration S3 : ' + (e.message || e.toString()))
   }
 }
 </script>
@@ -256,7 +287,7 @@ async function restoreS3(file: backend.BackupInfo) {
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
               <TableCell class="text-right">
-                <Button size="icon" variant="ghost" @click="restoreS3(file)">
+                <Button size="icon" variant="ghost" @click="selectS3ServerForRestore(file)">
                   <Plus class="w-5 h-5 text-primary" />
                 </Button>
               </TableCell>
@@ -299,6 +330,36 @@ async function restoreS3(file: backend.BackupInfo) {
         <Button 
           @click="restoreMongo" 
           :disabled="!selectedMongoServerId"
+        >
+          Restaurer
+        </Button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal pour sélectionner le serveur S3 -->
+  <div v-if="showS3ServerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+      <h3 class="text-lg font-semibold mb-4">Sélectionner le serveur S3/MinIO de destination</h3>
+      
+      <div v-if="pendingS3Restore" class="mb-4 p-3 bg-gray-50 rounded">
+        <p class="text-sm text-gray-600">Backup à restaurer :</p>
+        <p class="font-medium">{{ pendingS3Restore.name }}</p>
+      </div>
+      
+      <S3ServerSelector
+        v-model="selectedS3ServerId"
+        :auto-select-default="true"
+        :show-details="true"
+      />
+      
+      <div class="flex justify-end gap-3 mt-6">
+        <Button variant="outline" @click="showS3ServerModal = false">
+          Annuler
+        </Button>
+        <Button 
+          @click="restoreS3" 
+          :disabled="!selectedS3ServerId"
         >
           Restaurer
         </Button>
