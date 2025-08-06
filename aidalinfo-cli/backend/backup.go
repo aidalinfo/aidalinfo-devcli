@@ -248,20 +248,23 @@ func DownloadBackupWithCreds(ctx context.Context, creds S3Credentials, s3Path, d
 	return nil
 }
 
-// getUserTmpDir retourne le chemin /home/username/tmp et le crée si besoin
+// getUserTmpDir retourne un dossier temporaire sécurisé compatible avec tous les OS
 func getUserTmpDir() (string, error) {
-	u, err := user.Current()
-	if err != nil {
-		return "", fmt.Errorf("erreur récupération utilisateur courant: %v", err)
-	}
-	dir := "/home/" + u.Username + "/tmp"
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = os.MkdirAll(dir, 0o755)
+	// Utilise le dossier temporaire du système (compatible Windows, macOS, Linux)
+	baseTmpDir := os.TempDir()
+	
+	// Crée un sous-dossier spécifique à l'application pour éviter les conflits
+	appTmpDir := fmt.Sprintf("%s/aidalinfo-cli-tmp", baseTmpDir)
+	
+	// Vérifie si le dossier existe, sinon le crée
+	if _, err := os.Stat(appTmpDir); os.IsNotExist(err) {
+		err = os.MkdirAll(appTmpDir, 0o755)
 		if err != nil {
-			return "", fmt.Errorf("erreur création dossier tmp utilisateur: %v", err)
+			return "", fmt.Errorf("erreur création dossier tmp: %v", err)
 		}
 	}
-	return dir, nil
+	
+	return appTmpDir, nil
 }
 
 // RestoreMongoBackup télécharge un backup S3 et le restaure dans MongoDB
