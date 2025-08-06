@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { ListBackupsWithCreds, RestoreMongoBackup, RestoreS3Backup } from '../../wailsjs/go/main/App'
+import { ListBackupsWithCreds, RestoreMongoBackup, RestoreMySQLBackup, RestoreS3Backup } from '../../wailsjs/go/main/App'
 import { backend } from '../../wailsjs/go/models'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
@@ -22,13 +22,16 @@ import { Plus } from 'lucide-vue-next'
 import MongoServerSelector from '@/components/MongoServerSelector.vue'
 import { MongoServersManager, getMongoConnectionParams } from '@/utils/mongoServers'
 import type { MongoServer } from '@/utils/mongoServers'
+import MySQLServerSelector from '@/components/MySQLServerSelector.vue'
+import { MySQLServersManager, getMySQLConnectionParams } from '@/utils/mysqlServers'
+import type { MySQLServer } from '@/utils/mysqlServers'
 import S3ServerSelector from '@/components/S3ServerSelector.vue'
 import { S3ServersManager, getS3ConnectionParams } from '@/utils/s3Servers'
 import type { S3Server } from '@/utils/s3Servers'
 
 const PROJECTS = [
-  { label: 'Sat&Lease V2', value: 'Sat&LeaseV2', mongo: 'backup/prod-sateleasev2/mongo/', bucket: 'backup/prod-sateleasev2/bucket/' },
-  { label: 'LRD (Le Rédacteur)', value: 'LRD', mongo: 'backup/leredacteur/mongo/', bucket: 'backup/leredacteur/bucket/' },
+  { label: 'Sat&Lease V2', value: 'Sat&LeaseV2', mongo: 'backup/prod-sateleasev2/mongo/', mysql: 'backup/prod-sateleasev2/mysql/', bucket: 'backup/prod-sateleasev2/bucket/' },
+  { label: 'LRD (Le Rédacteur)', value: 'LRD', mongo: 'backup/leredacteur/mongo/', mysql: 'backup/leredacteur/mysql/', bucket: 'backup/leredacteur/bucket/' },
   // Ajoute ici d'autres projets si besoin
 ]
 
@@ -36,19 +39,28 @@ const project = ref(PROJECTS[0].value)
 const loading = ref(false)
 const error = ref('')
 const mongoBackups = ref<backend.BackupInfo[]>([])
+const mysqlBackups = ref<backend.BackupInfo[]>([])
 const bucketBackups = ref<backend.BackupInfo[]>([])
 
 const PAGE_SIZE = 10
 const mongoPage = ref(1)
+const mysqlPage = ref(1)
 const bucketPage = ref(1)
 
 const mongoTotalPages = computed(() => Math.ceil(mongoBackups.value.length / PAGE_SIZE) || 1)
+const mysqlTotalPages = computed(() => Math.ceil(mysqlBackups.value.length / PAGE_SIZE) || 1)
 const bucketTotalPages = computed(() => Math.ceil(bucketBackups.value.length / PAGE_SIZE) || 1)
 
 // Pour stocker le serveur MongoDB sélectionné
 const selectedMongoServerId = ref<string>('')
 const showMongoServerModal = ref(false)
 const pendingMongoRestore = ref<backend.BackupInfo | null>(null)
+
+// Pour stocker le serveur MySQL sélectionné
+const selectedMySQLServerId = ref<string>('')
+const showMySQLServerModal = ref(false)
+const pendingMySQLRestore = ref<backend.BackupInfo | null>(null)
+const mysqlDatabaseName = ref<string>('')
 
 // Pour stocker le serveur S3 sélectionné
 const selectedS3ServerId = ref<string>('')
@@ -59,6 +71,10 @@ const pagedMongoBackups = computed(() => {
   const start = (mongoPage.value - 1) * PAGE_SIZE
   return mongoBackups.value.slice(start, start + PAGE_SIZE)
 })
+const pagedMySQLBackups = computed(() => {
+  const start = (mysqlPage.value - 1) * PAGE_SIZE
+  return mysqlBackups.value.slice(start, start + PAGE_SIZE)
+})
 const pagedBucketBackups = computed(() => {
   const start = (bucketPage.value - 1) * PAGE_SIZE
   return bucketBackups.value.slice(start, start + PAGE_SIZE)
@@ -67,11 +83,15 @@ const pagedBucketBackups = computed(() => {
 function changeMongoPage(delta: number) {
   mongoPage.value = Math.max(1, Math.min(mongoPage.value + delta, mongoTotalPages.value))
 }
+function changeMySQLPage(delta: number) {
+  mysqlPage.value = Math.max(1, Math.min(mysqlPage.value + delta, mysqlTotalPages.value))
+}
 function changeBucketPage(delta: number) {
   bucketPage.value = Math.max(1, Math.min(bucketPage.value + delta, bucketTotalPages.value))
 }
 
 watch(mongoBackups, () => { mongoPage.value = 1 })
+watch(mysqlBackups, () => { mysqlPage.value = 1 })
 watch(bucketBackups, () => { bucketPage.value = 1 })
 
 watch(project, () => {
@@ -102,16 +122,25 @@ async function fetchBackups() {
   loading.value = true
   error.value = ''
   mongoBackups.value = []
+  mysqlBackups.value = []
   bucketBackups.value = []
   const creds = getS3Credentials()
   const current = getCurrentProject()
   try {
-    const [mongo, bucket] = await Promise.all([
+    const promises = [
       ListBackupsWithCreds(creds, current.mongo),
       ListBackupsWithCreds(creds, current.bucket)
-    ])
-    mongoBackups.value = mongo
-    bucketBackups.value = bucket
+    ]
+    // Ajouter MySQL si le chemin existe
+    if (current.mysql) {
+      promises.push(ListBackupsWithCreds(creds, current.mysql))
+    }
+    const results = await Promise.all(promises)
+    mongoBackups.value = results[0]
+    bucketBackups.value = results[1]
+    if (current.mysql && results[2]) {
+      mysqlBackups.value = results[2]
+    }
   } catch (e: any) {
     error.value = e.message || e.toString()
   } finally {
@@ -124,6 +153,12 @@ onMounted(fetchBackups)
 function selectMongoServerForRestore(file: backend.BackupInfo) {
   pendingMongoRestore.value = file
   showMongoServerModal.value = true
+}
+
+function selectMySQLServerForRestore(file: backend.BackupInfo) {
+  pendingMySQLRestore.value = file
+  mysqlDatabaseName.value = '' // Reset database name
+  showMySQLServerModal.value = true
 }
 
 async function restoreMongo() {
@@ -158,6 +193,43 @@ async function restoreMongo() {
     selectedMongoServerId.value = ''
   } catch (e: any) {
     toast.error('Erreur restauration MongoDB : ' + (e.message || e.toString()))
+  }
+}
+
+async function restoreMySQL() {
+  if (!pendingMySQLRestore.value || !selectedMySQLServerId.value || !mysqlDatabaseName.value) {
+    toast.error('Veuillez sélectionner un serveur MySQL et entrer le nom de la base de données')
+    return
+  }
+  
+  const server = MySQLServersManager.getServer(selectedMySQLServerId.value)
+  if (!server) {
+    toast.error('Serveur MySQL introuvable')
+    return
+  }
+  
+  const creds = getS3Credentials()
+  const current = getCurrentProject()
+  const { mysqlHost, mysqlPort, mysqlUser, mysqlPassword } = getMySQLConnectionParams(server)
+  
+  toast.info(`Restauration MySQL sur ${server.name} en cours...`)
+  try {
+    await RestoreMySQLBackup(
+      creds,
+      current.mysql + pendingMySQLRestore.value.name,
+      mysqlHost,
+      mysqlPort,
+      mysqlUser,
+      mysqlPassword,
+      mysqlDatabaseName.value
+    )
+    toast.success(`Restauration MySQL sur ${server.name} terminée avec succès !`)
+    showMySQLServerModal.value = false
+    pendingMySQLRestore.value = null
+    selectedMySQLServerId.value = ''
+    mysqlDatabaseName.value = ''
+  } catch (e: any) {
+    toast.error('Erreur restauration MySQL : ' + (e.message || e.toString()))
   }
 }
 
@@ -265,6 +337,46 @@ async function restoreS3() {
       </CardContent>
     </Card>
 
+    <Card v-if="getCurrentProject().mysql">
+      <CardHeader>
+        <CardTitle>Backups MySQL</CardTitle>
+        <CardDescription>Liste des backups MySQL pour le projet sélectionné.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableCaption>Backups MySQL disponibles</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nom du backup</TableHead>
+              <TableHead>Taille</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="file in pagedMySQLBackups" :key="file.name">
+              <TableCell>{{ file.name }}</TableCell>
+              <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
+              <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
+              <TableCell class="text-right">
+                <Button size="icon" variant="ghost" @click="selectMySQLServerForRestore(file)">
+                  <Plus class="w-5 h-5 text-primary" />
+                </Button>
+              </TableCell>
+            </TableRow>
+            <TableRow v-if="!mysqlBackups.length && !loading">
+              <TableCell colspan="4">Aucun backup trouvé.</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <div class="flex items-center justify-between mt-2" v-if="mysqlTotalPages > 1">
+          <Button size="sm" variant="outline" :disabled="mysqlPage === 1" @click="changeMySQLPage(-1)">Précédent</Button>
+          <span>Page {{ mysqlPage }} / {{ mysqlTotalPages }}</span>
+          <Button size="sm" variant="outline" :disabled="mysqlPage === mysqlTotalPages" @click="changeMySQLPage(1)">Suivant</Button>
+        </div>
+      </CardContent>
+    </Card>
+
     <Card>
       <CardHeader>
         <CardTitle>Backups S3 (Bucket)</CardTitle>
@@ -330,6 +442,49 @@ async function restoreS3() {
         <Button 
           @click="restoreMongo" 
           :disabled="!selectedMongoServerId"
+        >
+          Restaurer
+        </Button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal pour sélectionner le serveur MySQL -->
+  <div v-if="showMySQLServerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+      <h3 class="text-lg font-semibold mb-4">Sélectionner le serveur MySQL de destination</h3>
+      
+      <div v-if="pendingMySQLRestore" class="mb-4 p-3 bg-gray-50 rounded">
+        <p class="text-sm text-gray-600">Backup à restaurer :</p>
+        <p class="font-medium">{{ pendingMySQLRestore.name }}</p>
+      </div>
+      
+      <MySQLServerSelector
+        v-model="selectedMySQLServerId"
+        :auto-select-default="true"
+        :show-details="true"
+      />
+      
+      <div class="mt-4">
+        <Label for="mysql-database-name">Nom de la base de données cible *</Label>
+        <Input
+          v-model="mysqlDatabaseName"
+          id="mysql-database-name"
+          placeholder="Ex: my_database"
+          required
+        />
+        <p class="text-xs text-muted-foreground mt-1">
+          La base de données sera créée si elle n'existe pas
+        </p>
+      </div>
+      
+      <div class="flex justify-end gap-3 mt-6">
+        <Button variant="outline" @click="showMySQLServerModal = false">
+          Annuler
+        </Button>
+        <Button 
+          @click="restoreMySQL" 
+          :disabled="!selectedMySQLServerId || !mysqlDatabaseName"
         >
           Restaurer
         </Button>

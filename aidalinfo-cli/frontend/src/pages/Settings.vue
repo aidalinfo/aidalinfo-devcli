@@ -22,10 +22,23 @@
       <MongoServerManager />
     </CardContent>
   </Card>
+
+  <Card class="mx-5 mt-10 mb-10">
+    <CardHeader>
+      <CardTitle>Serveurs MySQL</CardTitle>
+      <CardDescription>
+        Gérez vos différents serveurs MySQL pour la restauration et les dumps.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <MySQLServerManager />
+    </CardContent>
+  </Card>
 </template>
 
 <script setup lang="ts">
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import MongoServerManager from '@/components/MongoServerManager.vue'
+import MySQLServerManager from '@/components/MySQLServerManager.vue'
 import S3ServerManager from '@/components/S3ServerManager.vue'
 </script>

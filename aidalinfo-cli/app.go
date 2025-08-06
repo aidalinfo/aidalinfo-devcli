@@ -151,3 +151,24 @@ func (a *App) TransferMongoDatabase(sourceHost, sourcePort, sourceUser, sourcePa
 func (a *App) DumpMongoDatabase(mongoHost, mongoPort, mongoUser, mongoPassword, database string) (string, error) {
 	return backend.DumpMongoDatabase(a.ctx, mongoHost, mongoPort, mongoUser, mongoPassword, database)
 }
+
+// Expose MySQL functions to frontend
+func (a *App) ListMySQLDatabases(mysqlHost, mysqlPort, mysqlUser, mysqlPassword string) ([]string, error) {
+	return backend.ListMySQLDatabases(a.ctx, mysqlHost, mysqlPort, mysqlUser, mysqlPassword)
+}
+
+func (a *App) TransferMySQLDatabase(sourceHost, sourcePort, sourceUser, sourcePassword, destHost, destPort, destUser, destPassword, database string, dropExisting bool) error {
+	return backend.TransferMySQLDatabase(a.ctx, sourceHost, sourcePort, sourceUser, sourcePassword, destHost, destPort, destUser, destPassword, database, dropExisting)
+}
+
+func (a *App) DumpMySQLDatabase(mysqlHost, mysqlPort, mysqlUser, mysqlPassword, database string) (string, error) {
+	return backend.DumpMySQLDatabase(a.ctx, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, database)
+}
+
+func (a *App) RestoreMySQLBackup(creds backend.S3Credentials, s3Path, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, database string) error {
+	return backend.RestoreMySQLBackup(a.ctx, creds, s3Path, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, database)
+}
+
+func (a *App) TestMySQLConnection(mysqlHost, mysqlPort, mysqlUser, mysqlPassword string) error {
+	return backend.TestMySQLConnection(a.ctx, mysqlHost, mysqlPort, mysqlUser, mysqlPassword)
+}
