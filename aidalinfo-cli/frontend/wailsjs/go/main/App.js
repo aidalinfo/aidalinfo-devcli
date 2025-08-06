@@ -22,6 +22,10 @@ export function DumpMongoDatabase(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['DumpMongoDatabase'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function DumpMySQLDatabase(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['DumpMySQLDatabase'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function GetBranches(arg1) {
   return window['go']['main']['App']['GetBranches'](arg1);
 }
@@ -70,6 +74,10 @@ export function ListMongoDatabases(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ListMongoDatabases'](arg1, arg2, arg3, arg4);
 }
 
+export function ListMySQLDatabases(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ListMySQLDatabases'](arg1, arg2, arg3, arg4);
+}
+
 export function ListSubmodules(arg1) {
   return window['go']['main']['App']['ListSubmodules'](arg1);
 }
@@ -86,6 +94,10 @@ export function RestoreMongoBackup(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['RestoreMongoBackup'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
+export function RestoreMySQLBackup(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['RestoreMySQLBackup'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function RestoreS3Backup(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['RestoreS3Backup'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
@@ -94,8 +106,16 @@ export function TagAction(arg1, arg2) {
   return window['go']['main']['App']['TagAction'](arg1, arg2);
 }
 
+export function TestMySQLConnection(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['TestMySQLConnection'](arg1, arg2, arg3, arg4);
+}
+
 export function TransferMongoDatabase(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
   return window['go']['main']['App']['TransferMongoDatabase'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+}
+
+export function TransferMySQLDatabase(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
+  return window['go']['main']['App']['TransferMySQLDatabase'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
 }
 
 export function UpdateGitSubmodules(arg1, arg2) {
