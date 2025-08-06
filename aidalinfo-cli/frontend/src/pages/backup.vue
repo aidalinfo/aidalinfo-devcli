@@ -19,6 +19,9 @@ import {
 } from '@/components/ui/table'
 import { toast } from 'vue-sonner'
 import { Plus } from 'lucide-vue-next'
+import MongoServerSelector from '@/components/MongoServerSelector.vue'
+import { MongoServersManager, getMongoConnectionParams } from '@/utils/mongoServers'
+import type { MongoServer } from '@/utils/mongoServers'
 
 const PROJECTS = [
   { label: 'Sat&Lease V2', value: 'Sat&LeaseV2', mongo: 'backup/prod-sateleasev2/mongo/', bucket: 'backup/prod-sateleasev2/bucket/' },
@@ -38,6 +41,11 @@ const bucketPage = ref(1)
 
 const mongoTotalPages = computed(() => Math.ceil(mongoBackups.value.length / PAGE_SIZE) || 1)
 const bucketTotalPages = computed(() => Math.ceil(bucketBackups.value.length / PAGE_SIZE) || 1)
+
+// Pour stocker le serveur MongoDB sélectionné
+const selectedMongoServerId = ref<string>('')
+const showMongoServerModal = ref(false)
+const pendingMongoRestore = ref<backend.BackupInfo | null>(null)
 
 const pagedMongoBackups = computed(() => {
   const start = (mongoPage.value - 1) * PAGE_SIZE
@@ -96,25 +104,41 @@ async function fetchBackups() {
 
 onMounted(fetchBackups)
 
-async function restoreMongo(file: backend.BackupInfo) {
+function selectMongoServerForRestore(file: backend.BackupInfo) {
+  pendingMongoRestore.value = file
+  showMongoServerModal.value = true
+}
+
+async function restoreMongo() {
+  if (!pendingMongoRestore.value || !selectedMongoServerId.value) {
+    toast.error('Veuillez sélectionner un serveur MongoDB')
+    return
+  }
+  
+  const server = MongoServersManager.getServer(selectedMongoServerId.value)
+  if (!server) {
+    toast.error('Serveur MongoDB introuvable')
+    return
+  }
+  
   const creds = getS3Credentials()
   const current = getCurrentProject()
-  // Récupère les paramètres MongoDB depuis localStorage
-  const mongoHost = localStorage.getItem('mongo_host') || 'localhost'
-  const mongoPort = localStorage.getItem('mongo_port') || '27017'
-  const mongoUser = localStorage.getItem('mongo_user') || ''
-  const mongoPassword = localStorage.getItem('mongo_password') || ''
-  toast.info('Restauration MongoDB en cours...')
+  const { mongoHost, mongoPort, mongoUser, mongoPassword } = getMongoConnectionParams(server)
+  
+  toast.info(`Restauration MongoDB sur ${server.name} en cours...`)
   try {
     await RestoreMongoBackup(
       creds,
-      current.mongo + file.name,
+      current.mongo + pendingMongoRestore.value.name,
       mongoHost,
       mongoPort,
       mongoUser,
       mongoPassword
     )
-    toast.success('Restauration MongoDB terminée avec succès !')
+    toast.success(`Restauration MongoDB sur ${server.name} terminée avec succès !`)
+    showMongoServerModal.value = false
+    pendingMongoRestore.value = null
+    selectedMongoServerId.value = ''
   } catch (e: any) {
     toast.error('Erreur restauration MongoDB : ' + (e.message || e.toString()))
   }
@@ -192,7 +216,7 @@ async function restoreS3(file: backend.BackupInfo) {
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
               <TableCell class="text-right">
-                <Button size="icon" variant="ghost" @click="restoreMongo(file)">
+                <Button size="icon" variant="ghost" @click="selectMongoServerForRestore(file)">
                   <Plus class="w-5 h-5 text-primary" />
                 </Button>
               </TableCell>
@@ -250,5 +274,35 @@ async function restoreS3(file: backend.BackupInfo) {
       </CardContent>
     </Card>
 
+  </div>
+
+  <!-- Modal pour sélectionner le serveur MongoDB -->
+  <div v-if="showMongoServerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+      <h3 class="text-lg font-semibold mb-4">Sélectionner le serveur MongoDB de destination</h3>
+      
+      <div v-if="pendingMongoRestore" class="mb-4 p-3 bg-gray-50 rounded">
+        <p class="text-sm text-gray-600">Backup à restaurer :</p>
+        <p class="font-medium">{{ pendingMongoRestore.name }}</p>
+      </div>
+      
+      <MongoServerSelector
+        v-model="selectedMongoServerId"
+        :auto-select-default="true"
+        :show-details="true"
+      />
+      
+      <div class="flex justify-end gap-3 mt-6">
+        <Button variant="outline" @click="showMongoServerModal = false">
+          Annuler
+        </Button>
+        <Button 
+          @click="restoreMongo" 
+          :disabled="!selectedMongoServerId"
+        >
+          Restaurer
+        </Button>
+      </div>
+    </div>
   </div>
 </template>
