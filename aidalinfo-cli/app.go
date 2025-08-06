@@ -189,3 +189,42 @@ func (a *App) DumpPostgresDatabase(pgHost, pgPort, pgUser, pgPassword, database 
 func (a *App) RestorePostgresBackup(creds backend.S3Credentials, s3Path, pgHost, pgPort, pgUser, pgPassword, pgDatabase string) error {
 	return backend.RestorePostgresBackup(a.ctx, creds, s3Path, pgHost, pgPort, pgUser, pgPassword, pgDatabase)
 }
+
+// SelectDownloadDirectory opens a native directory selection dialog
+func (a *App) SelectDownloadDirectory() (string, error) {
+	dialogOptions := runtime.OpenDialogOptions{
+		Title: "Sélectionner le dossier de destination",
+	}
+	
+	selectedDir, err := runtime.OpenDirectoryDialog(a.ctx, dialogOptions)
+	if err != nil {
+		return "", fmt.Errorf("erreur lors de la sélection du dossier: %v", err)
+	}
+	
+	// Si l'utilisateur annule, selectedDir sera vide
+	if selectedDir == "" {
+		return "", fmt.Errorf("aucun dossier sélectionné")
+	}
+	
+	return selectedDir, nil
+}
+
+// DownloadBackupToDirectory downloads a backup to a user-selected directory
+func (a *App) DownloadBackupToDirectory(creds backend.S3Credentials, s3Path, filename string) (string, error) {
+	// D'abord, demander à l'utilisateur de sélectionner un dossier
+	selectedDir, err := a.SelectDownloadDirectory()
+	if err != nil {
+		return "", err
+	}
+	
+	// Construire le chemin de destination complet
+	destPath := selectedDir + "/" + filename
+	
+	// Utiliser la fonction de téléchargement existante
+	err = backend.DownloadBackupWithCreds(a.ctx, creds, s3Path, destPath)
+	if err != nil {
+		return "", fmt.Errorf("erreur lors du téléchargement: %v", err)
+	}
+	
+	return destPath, nil
+}

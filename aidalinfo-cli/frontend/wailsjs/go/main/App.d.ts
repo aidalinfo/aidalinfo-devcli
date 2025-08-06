@@ -8,6 +8,8 @@ export function CleanSubmodules(arg1:Array<string>):Promise<Array<string>>;
 
 export function CreateTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function DownloadBackupToDirectory(arg1:backend.S3Credentials,arg2:string,arg3:string):Promise<string>;
+
 export function DownloadBackupWithCreds(arg1:backend.S3Credentials,arg2:string,arg3:string):Promise<void>;
 
 export function DumpMongoDatabase(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
@@ -57,6 +59,8 @@ export function RestoreMySQLBackup(arg1:backend.S3Credentials,arg2:string,arg3:s
 export function RestorePostgresBackup(arg1:backend.S3Credentials,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<void>;
 
 export function RestoreS3Backup(arg1:backend.S3Credentials,arg2:backend.S3Credentials,arg3:string,arg4:string,arg5:string,arg6:string,arg7:boolean):Promise<void>;
+
+export function SelectDownloadDirectory():Promise<string>;
 
 export function TagAction(arg1:string,arg2:string):Promise<void>;
 

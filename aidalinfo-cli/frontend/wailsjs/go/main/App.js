@@ -14,6 +14,10 @@ export function CreateTag(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateTag'](arg1, arg2, arg3);
 }
 
+export function DownloadBackupToDirectory(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DownloadBackupToDirectory'](arg1, arg2, arg3);
+}
+
 export function DownloadBackupWithCreds(arg1, arg2, arg3) {
   return window['go']['main']['App']['DownloadBackupWithCreds'](arg1, arg2, arg3);
 }
@@ -112,6 +116,10 @@ export function RestorePostgresBackup(arg1, arg2, arg3, arg4, arg5, arg6, arg7) 
 
 export function RestoreS3Backup(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['RestoreS3Backup'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function SelectDownloadDirectory() {
+  return window['go']['main']['App']['SelectDownloadDirectory']();
 }
 
 export function TagAction(arg1, arg2) {

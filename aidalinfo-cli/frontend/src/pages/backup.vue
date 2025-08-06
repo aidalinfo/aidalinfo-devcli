@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { ListBackupsWithCreds, RestoreMongoBackup, RestoreMySQLBackup, RestoreS3Backup } from '../../wailsjs/go/main/App'
+import { ListBackupsWithCreds, RestoreMongoBackup, RestoreMySQLBackup, RestoreS3Backup, DownloadBackupToDirectory } from '../../wailsjs/go/main/App'
 import { backend } from '../../wailsjs/go/models'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'vue-sonner'
-import { Plus } from 'lucide-vue-next'
+import { Plus, Download } from 'lucide-vue-next'
 import MongoServerSelector from '@/components/MongoServerSelector.vue'
 import { MongoServersManager, getMongoConnectionParams } from '@/utils/mongoServers'
 import type { MongoServer } from '@/utils/mongoServers'
@@ -275,6 +275,61 @@ async function restoreS3() {
     toast.error('Erreur restauration S3 : ' + (e.message || e.toString()))
   }
 }
+
+// Download functions
+async function downloadMongoBackup(file: backend.BackupInfo) {
+  const creds = getS3Credentials()
+  const current = getCurrentProject()
+  const s3Path = current.mongo + file.name
+  
+  toast.info('Sélectionnez un dossier de destination...')
+  try {
+    const downloadPath = await DownloadBackupToDirectory(creds, s3Path, file.name)
+    toast.success(`Backup MongoDB téléchargé avec succès dans : ${downloadPath}`)
+  } catch (e: any) {
+    if (e.message && e.message.includes('aucun dossier sélectionné')) {
+      // L'utilisateur a annulé, pas d'erreur
+      return
+    }
+    toast.error('Erreur téléchargement MongoDB : ' + (e.message || e.toString()))
+  }
+}
+
+async function downloadMySQLBackup(file: backend.BackupInfo) {
+  const creds = getS3Credentials()
+  const current = getCurrentProject()
+  const s3Path = current.mysql + file.name
+  
+  toast.info('Sélectionnez un dossier de destination...')
+  try {
+    const downloadPath = await DownloadBackupToDirectory(creds, s3Path, file.name)
+    toast.success(`Backup MySQL téléchargé avec succès dans : ${downloadPath}`)
+  } catch (e: any) {
+    if (e.message && e.message.includes('aucun dossier sélectionné')) {
+      // L'utilisateur a annulé, pas d'erreur
+      return
+    }
+    toast.error('Erreur téléchargement MySQL : ' + (e.message || e.toString()))
+  }
+}
+
+async function downloadS3Backup(file: backend.BackupInfo) {
+  const creds = getS3Credentials()
+  const current = getCurrentProject()
+  const s3Path = current.bucket + file.name
+  
+  toast.info('Sélectionnez un dossier de destination...')
+  try {
+    const downloadPath = await DownloadBackupToDirectory(creds, s3Path, file.name)
+    toast.success(`Backup S3 téléchargé avec succès dans : ${downloadPath}`)
+  } catch (e: any) {
+    if (e.message && e.message.includes('aucun dossier sélectionné')) {
+      // L'utilisateur a annulé, pas d'erreur
+      return
+    }
+    toast.error('Erreur téléchargement S3 : ' + (e.message || e.toString()))
+  }
+}
 </script>
 
 <template>
@@ -319,9 +374,14 @@ async function restoreS3() {
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
               <TableCell class="text-right">
-                <Button size="icon" variant="ghost" @click="selectMongoServerForRestore(file)">
-                  <Plus class="w-5 h-5 text-primary" />
-                </Button>
+                <div class="flex gap-1 justify-end">
+                  <Button size="icon" variant="ghost" @click="downloadMongoBackup(file)" title="Télécharger">
+                    <Download class="w-5 h-5 text-blue-600" />
+                  </Button>
+                  <Button size="icon" variant="ghost" @click="selectMongoServerForRestore(file)" title="Restaurer">
+                    <Plus class="w-5 h-5 text-primary" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
             <TableRow v-if="!mongoBackups.length && !loading">
@@ -359,9 +419,14 @@ async function restoreS3() {
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
               <TableCell class="text-right">
-                <Button size="icon" variant="ghost" @click="selectMySQLServerForRestore(file)">
-                  <Plus class="w-5 h-5 text-primary" />
-                </Button>
+                <div class="flex gap-1 justify-end">
+                  <Button size="icon" variant="ghost" @click="downloadMySQLBackup(file)" title="Télécharger">
+                    <Download class="w-5 h-5 text-blue-600" />
+                  </Button>
+                  <Button size="icon" variant="ghost" @click="selectMySQLServerForRestore(file)" title="Restaurer">
+                    <Plus class="w-5 h-5 text-primary" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
             <TableRow v-if="!mysqlBackups.length && !loading">
@@ -399,9 +464,14 @@ async function restoreS3() {
               <TableCell>{{ (file.size / 1024 / 1024).toFixed(2) }} Mo</TableCell>
               <TableCell>{{ new Date(file.lastModified).toLocaleString() }}</TableCell>
               <TableCell class="text-right">
-                <Button size="icon" variant="ghost" @click="selectS3ServerForRestore(file)">
-                  <Plus class="w-5 h-5 text-primary" />
-                </Button>
+                <div class="flex gap-1 justify-end">
+                  <Button size="icon" variant="ghost" @click="downloadS3Backup(file)" title="Télécharger">
+                    <Download class="w-5 h-5 text-blue-600" />
+                  </Button>
+                  <Button size="icon" variant="ghost" @click="selectS3ServerForRestore(file)" title="Restaurer">
+                    <Plus class="w-5 h-5 text-primary" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
             <TableRow v-if="!bucketBackups.length && !loading">
