@@ -714,3 +714,136 @@ func (p *progressReaderWithLog) Read(b []byte) (int, error) {
 	}
 	return n, err
 }
+
+// DumpMongoDatabase crée un dump d'une base MongoDB
+func DumpMongoDatabase(ctx context.Context, mongoHost, mongoPort, mongoUser, mongoPassword, database string) (string, error) {
+	tmpDir, err := getUserTmpDir()
+	if err != nil {
+		return "", err
+	}
+
+	// Créer un fichier temporaire pour le dump
+	tmpFile, err := os.CreateTemp(tmpDir, fmt.Sprintf("mongo-dump-%s-*.bson.gz", database))
+	if err != nil {
+		return "", fmt.Errorf("erreur création fichier temporaire: %v", err)
+	}
+	tmpFilePath := tmpFile.Name()
+	tmpFile.Close()
+
+	// Prépare la commande mongodump
+	args := []string{
+		"--gzip",
+		"--archive=" + tmpFilePath,
+		"--host", mongoHost,
+		"--port", mongoPort,
+		"--db", database,
+	}
+	if mongoUser != "" {
+		args = append(args, "--username", mongoUser)
+	}
+	if mongoPassword != "" {
+		args = append(args, "--password", mongoPassword)
+	}
+
+	LogToFrontend("info", fmt.Sprintf("Création du dump de la base %s...", database))
+	cmd := exec.Command("mongodump", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		os.Remove(tmpFilePath)
+		LogToFrontend("error", fmt.Sprintf("Erreur mongodump: %v", err))
+		return "", fmt.Errorf("erreur mongodump: %v", err)
+	}
+
+	LogToFrontend("success", fmt.Sprintf("Dump de %s créé avec succès", database))
+	return tmpFilePath, nil
+}
+
+// TransferMongoDatabase transfère une base de données entre deux serveurs MongoDB
+func TransferMongoDatabase(ctx context.Context, sourceHost, sourcePort, sourceUser, sourcePassword, 
+	destHost, destPort, destUser, destPassword, database string, dropExisting bool) error {
+	
+	LogToFrontend("info", fmt.Sprintf("Début du transfert de la base %s", database))
+	
+	// Étape 1: Créer le dump de la source
+	dumpFile, err := DumpMongoDatabase(ctx, sourceHost, sourcePort, sourceUser, sourcePassword, database)
+	if err != nil {
+		return fmt.Errorf("erreur création dump: %v", err)
+	}
+	defer os.Remove(dumpFile)
+	
+	// Étape 2: Restaurer sur la destination
+	args := []string{
+		"--gzip",
+		"--archive=" + dumpFile,
+		"--host", destHost,
+		"--port", destPort,
+	}
+	if destUser != "" {
+		args = append(args, "--username", destUser)
+	}
+	if destPassword != "" {
+		args = append(args, "--password", destPassword)
+	}
+	if dropExisting {
+		args = append(args, "--drop")
+	}
+	
+	LogToFrontend("info", fmt.Sprintf("Restauration de %s sur le serveur de destination...", database))
+	cmd := exec.Command("mongorestore", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	if err := cmd.Run(); err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur mongorestore: %v", err))
+		return fmt.Errorf("erreur mongorestore: %v", err)
+	}
+	
+	LogToFrontend("success", fmt.Sprintf("Transfert de %s terminé avec succès", database))
+	return nil
+}
+
+// ListMongoDatabases liste les bases de données disponibles sur un serveur MongoDB
+func ListMongoDatabases(ctx context.Context, mongoHost, mongoPort, mongoUser, mongoPassword string) ([]string, error) {
+	// Construire l'URI MongoDB
+	var uri string
+	if mongoUser != "" && mongoPassword != "" {
+		uri = fmt.Sprintf("mongodb://%s:%s@%s:%s", mongoUser, mongoPassword, mongoHost, mongoPort)
+	} else {
+		uri = fmt.Sprintf("mongodb://%s:%s", mongoHost, mongoPort)
+	}
+	
+	// Utiliser mongo shell pour lister les bases
+	args := []string{
+		uri,
+		"--quiet",
+		"--eval",
+		"db.adminCommand('listDatabases').databases.forEach(function(d){print(d.name)})",
+	}
+	
+	cmd := exec.Command("mongosh", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback sur l'ancienne commande mongo si mongosh n'est pas disponible
+		args[0] = uri
+		cmd = exec.Command("mongo", args...)
+		output, err = cmd.Output()
+		if err != nil {
+			LogToFrontend("error", fmt.Sprintf("Erreur listing databases: %v", err))
+			return nil, fmt.Errorf("erreur listing databases: %v", err)
+		}
+	}
+	
+	// Parser la sortie pour obtenir la liste des bases
+	lines := strings.Split(string(output), "\n")
+	var databases []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "MongoDB") && !strings.Contains(line, "connecting") {
+			databases = append(databases, line)
+		}
+	}
+	
+	return databases, nil
+}

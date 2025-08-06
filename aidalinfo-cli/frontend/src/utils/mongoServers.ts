@@ -40,6 +40,13 @@ export class MongoServersManager {
   }
 
   /**
+   * Récupère un serveur par son ID (alias pour getServer)
+   */
+  static getServerById(id: string): MongoServer | undefined {
+    return this.getServer(id);
+  }
+
+  /**
    * Récupère le serveur par défaut
    */
   static getDefaultServer(): MongoServer | undefined {
