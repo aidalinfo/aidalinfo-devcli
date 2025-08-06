@@ -1,6 +1,6 @@
 <template>
   <Dialog :open="open" @update:open="handleClose">
-    <DialogContent class="sm:max-w-[700px]">
+    <DialogContent class="sm:max-w-[700px] max-h-[90vh] flex flex-col">
       <DialogHeader>
         <DialogTitle>Transfert de base de données MongoDB</DialogTitle>
         <DialogDescription>
@@ -8,7 +8,7 @@
         </DialogDescription>
       </DialogHeader>
 
-      <div class="space-y-6">
+      <div class="space-y-6 overflow-y-auto flex-1 pr-2">
         <!-- Serveur source -->
         <div>
           <Label class="text-sm font-medium mb-2 block">Serveur source</Label>
@@ -126,7 +126,6 @@
           <MongoServerSelector
             v-model="selectedDestinationId"
             :exclude-server-id="sourceServer.id"
-            label="Choisir le serveur de destination"
           />
         </div>
 
@@ -203,7 +202,7 @@
         </div>
       </div>
 
-      <DialogFooter>
+      <DialogFooter class="flex-shrink-0">
         <Button variant="outline" @click="handleClose" :disabled="transferInProgress">
           Annuler
         </Button>
@@ -251,7 +250,7 @@ interface Props {
 const props = defineProps<Props>();
 const emit = defineEmits(['close']);
 
-const destinationType = ref<'clone' | 'existing'>('clone');
+const destinationType = ref<'clone' | 'existing'>('existing');
 const selectedDestinationId = ref('');
 const databases = ref<string[]>([]);
 const selectedDatabases = ref<string[]>([]);
@@ -396,7 +395,7 @@ const handleClose = () => {
   if (!transferInProgress.value) {
     emit('close');
     // Reset form
-    destinationType.value = 'clone';
+    destinationType.value = 'existing';
     selectedDestinationId.value = '';
     selectedDatabases.value = [];
     databases.value = [];

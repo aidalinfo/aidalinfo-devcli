@@ -18,6 +18,10 @@ export function DownloadBackupWithCreds(arg1, arg2, arg3) {
   return window['go']['main']['App']['DownloadBackupWithCreds'](arg1, arg2, arg3);
 }
 
+export function DumpMongoDatabase(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['DumpMongoDatabase'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function GetBranches(arg1) {
   return window['go']['main']['App']['GetBranches'](arg1);
 }
@@ -62,6 +66,10 @@ export function ListBackupsWithCreds(arg1, arg2) {
   return window['go']['main']['App']['ListBackupsWithCreds'](arg1, arg2);
 }
 
+export function ListMongoDatabases(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ListMongoDatabases'](arg1, arg2, arg3, arg4);
+}
+
 export function ListSubmodules(arg1) {
   return window['go']['main']['App']['ListSubmodules'](arg1);
 }
@@ -86,18 +94,10 @@ export function TagAction(arg1, arg2) {
   return window['go']['main']['App']['TagAction'](arg1, arg2);
 }
 
-export function UpdateGitSubmodules(arg1, arg2) {
-  return window['go']['main']['App']['UpdateGitSubmodules'](arg1, arg2);
-}
-
-export function ListMongoDatabases(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['ListMongoDatabases'](arg1, arg2, arg3, arg4);
-}
-
 export function TransferMongoDatabase(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
   return window['go']['main']['App']['TransferMongoDatabase'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
 }
 
-export function DumpMongoDatabase(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['DumpMongoDatabase'](arg1, arg2, arg3, arg4, arg5);
+export function UpdateGitSubmodules(arg1, arg2) {
+  return window['go']['main']['App']['UpdateGitSubmodules'](arg1, arg2);
 }

@@ -329,6 +329,8 @@ func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string,
 	args := []string{"--gzip", "--archive=" + tmpFile.Name(), "--host", mongoHost, "--port", mongoPort}
 	if mongoUser != "" {
 		args = append(args, "--username", mongoUser)
+		// Ajouter la base d'authentification (par défaut admin)
+		args = append(args, "--authenticationDatabase", "admin")
 	}
 	if mongoPassword != "" {
 		args = append(args, "--password", mongoPassword)
@@ -740,6 +742,8 @@ func DumpMongoDatabase(ctx context.Context, mongoHost, mongoPort, mongoUser, mon
 	}
 	if mongoUser != "" {
 		args = append(args, "--username", mongoUser)
+		// Ajouter la base d'authentification (par défaut admin)
+		args = append(args, "--authenticationDatabase", "admin")
 	}
 	if mongoPassword != "" {
 		args = append(args, "--password", mongoPassword)
@@ -782,6 +786,8 @@ func TransferMongoDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 	}
 	if destUser != "" {
 		args = append(args, "--username", destUser)
+		// Ajouter la base d'authentification (par défaut admin)
+		args = append(args, "--authenticationDatabase", "admin")
 	}
 	if destPassword != "" {
 		args = append(args, "--password", destPassword)
@@ -809,7 +815,8 @@ func ListMongoDatabases(ctx context.Context, mongoHost, mongoPort, mongoUser, mo
 	// Construire l'URI MongoDB
 	var uri string
 	if mongoUser != "" && mongoPassword != "" {
-		uri = fmt.Sprintf("mongodb://%s:%s@%s:%s", mongoUser, mongoPassword, mongoHost, mongoPort)
+		// Ajouter authSource=admin pour l'authentification
+		uri = fmt.Sprintf("mongodb://%s:%s@%s:%s/?authSource=admin", mongoUser, mongoPassword, mongoHost, mongoPort)
 	} else {
 		uri = fmt.Sprintf("mongodb://%s:%s", mongoHost, mongoPort)
 	}

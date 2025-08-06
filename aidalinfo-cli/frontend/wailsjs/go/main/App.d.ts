@@ -10,6 +10,8 @@ export function CreateTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function DownloadBackupWithCreds(arg1:backend.S3Credentials,arg2:string,arg3:string):Promise<void>;
 
+export function DumpMongoDatabase(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
+
 export function GetBranches(arg1:string):Promise<Array<string>>;
 
 export function GetCurrentBranch(arg1:string):Promise<string>;
@@ -32,6 +34,8 @@ export function InstallSubmodules(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function ListBackupsWithCreds(arg1:backend.S3Credentials,arg2:string):Promise<Array<backend.BackupInfo>>;
 
+export function ListMongoDatabases(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<string>>;
+
 export function ListSubmodules(arg1:string):Promise<Array<string>>;
 
 export function NpmUpdateAction(arg1:string):Promise<void>;
@@ -44,10 +48,6 @@ export function RestoreS3Backup(arg1:backend.S3Credentials,arg2:backend.S3Creden
 
 export function TagAction(arg1:string,arg2:string):Promise<void>;
 
-export function UpdateGitSubmodules(arg1:string,arg2:Array<string>):Promise<void>;
-
-export function ListMongoDatabases(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<string>>;
-
 export function TransferMongoDatabase(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:boolean):Promise<void>;
 
-export function DumpMongoDatabase(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
+export function UpdateGitSubmodules(arg1:string,arg2:Array<string>):Promise<void>;

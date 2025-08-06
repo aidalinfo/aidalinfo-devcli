@@ -36,6 +36,7 @@ declare module 'vue' {
     HelloWorld: typeof import('./src/components/HelloWorld.vue')['default']
     Input: typeof import('./src/components/ui/input/Input.vue')['default']
     Label: typeof import('./src/components/ui/label/Label.vue')['default']
+    MongoDatabaseTransfer: typeof import('./src/components/MongoDatabaseTransfer.vue')['default']
     MongoServerManager: typeof import('./src/components/MongoServerManager.vue')['default']
     MongoServerSelector: typeof import('./src/components/MongoServerSelector.vue')['default']
     Navigation: typeof import('./src/components/Navigation.vue')['default']

@@ -5,6 +5,7 @@ export interface MongoServer {
   port: string;
   user: string;
   password: string;
+  authDatabase?: string; // Base d'authentification (par défaut: admin)
   isDefault?: boolean;
   createdAt: string;
   updatedAt: string;

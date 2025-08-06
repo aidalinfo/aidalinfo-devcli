@@ -170,6 +170,18 @@
             </div>
           </div>
 
+          <div>
+            <Label for="auth-database">Base d'authentification</Label>
+            <Input
+              v-model="formData.authDatabase"
+              id="auth-database"
+              placeholder="admin (par défaut)"
+            />
+            <p class="text-xs text-muted-foreground mt-1">
+              Base de données utilisée pour l'authentification (généralement 'admin')
+            </p>
+          </div>
+
           <div class="flex items-center space-x-2">
             <input
               v-model="formData.isDefault"
@@ -279,6 +291,7 @@ const formData = ref({
   port: '27017',
   user: '',
   password: '',
+  authDatabase: '',
   isDefault: false
 });
 
@@ -299,6 +312,7 @@ const resetForm = () => {
     port: '27017',
     user: '',
     password: '',
+    authDatabase: '',
     isDefault: false
   };
 };
@@ -311,6 +325,7 @@ const editServer = (server: MongoServer) => {
     port: server.port,
     user: server.user,
     password: server.password,
+    authDatabase: server.authDatabase || '',
     isDefault: server.isDefault || false
   };
 };
