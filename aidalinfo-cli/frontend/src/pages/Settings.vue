@@ -73,6 +73,18 @@
           <Input id="s3-region" v-model="s3Region" placeholder="fr-par" />
         </div>
         <div>
+          <Label for="s3-use-https">Protocole</Label>
+          <Select v-model="s3UseHttps">
+            <SelectTrigger id="s3-use-https">
+              <SelectValue placeholder="Sélectionner le protocole" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="true">HTTPS (sécurisé)</SelectItem>
+              <SelectItem value="false">HTTP</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
           <Label for="s3local-access-key">Access Key (local S3)</Label>
           <Input id="s3local-access-key" v-model="s3LocalAccessKey" autocomplete="off" />
         </div>
@@ -92,6 +104,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const accessKey = ref('')
 const secretKey = ref('')
@@ -102,6 +115,7 @@ const mongoPassword = ref('')
 const s3Host = ref('localhost')
 const s3Port = ref('9000')
 const s3Region = ref('fr-par')
+const s3UseHttps = ref('false')
 const s3LocalAccessKey = ref('')
 const s3LocalSecretKey = ref('')
 
@@ -116,6 +130,7 @@ onMounted(() => {
   s3Host.value = localStorage.getItem('s3_host') || 'localhost'
   s3Port.value = localStorage.getItem('s3_port') || '9000'
   s3Region.value = localStorage.getItem('s3_region') || 'fr-par'
+  s3UseHttps.value = localStorage.getItem('s3_use_https') || 'false'
   s3LocalAccessKey.value = localStorage.getItem('s3local_access_key') || ''
   s3LocalSecretKey.value = localStorage.getItem('s3local_secret_key') || ''
 })
@@ -136,6 +151,7 @@ function saveS3Advanced() {
   localStorage.setItem('s3_host', s3Host.value)
   localStorage.setItem('s3_port', s3Port.value)
   localStorage.setItem('s3_region', s3Region.value)
+  localStorage.setItem('s3_use_https', s3UseHttps.value)
   localStorage.setItem('s3local_access_key', s3LocalAccessKey.value)
   localStorage.setItem('s3local_secret_key', s3LocalSecretKey.value)
   alert('Paramètres S3 avancés sauvegardés !')
