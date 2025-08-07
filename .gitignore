@@ -1,2 +1,3 @@
-aidalinfo-devcli
-aidalinfo-cli
+build/bin
+node_modules
+frontend/dist
