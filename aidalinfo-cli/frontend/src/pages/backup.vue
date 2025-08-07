@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { ListBackupsWithCreds, RestoreMongoBackup, RestoreMySQLBackup, RestoreS3Backup, DownloadBackupToDirectory } from '../../wailsjs/go/main/App'
+import { ListBackupsWithCreds, RestoreMongoBackup, RestoreMySQLBackup, RestoreS3Backup, DownloadBackupWithCreds } from '../../wailsjs/go/main/App'
 import { backend } from '../../wailsjs/go/models'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
@@ -291,14 +291,11 @@ async function downloadBackup(file: backend.BackupInfo, type: 'mongo' | 'mysql' 
   const { path, label } = config[type]
   const s3Path = path + file.name
   
-  toast.info('Sélectionnez un dossier de destination...')
+  toast.info('Téléchargement en cours...')
   try {
-    const downloadPath = await DownloadBackupToDirectory(creds, s3Path, file.name)
-    toast.success(`Backup ${label} téléchargé avec succès dans : ${downloadPath}`)
+    await DownloadBackupWithCreds(creds, s3Path, file.name)
+    toast.success(`Backup ${label} téléchargé avec succès`)
   } catch (e: any) {
-    if (e.message && e.message.includes('aucun dossier sélectionné')) {
-      return // L'utilisateur a annulé, pas d'erreur
-    }
     toast.error(`Erreur téléchargement ${label} : ` + (e.message || e.toString()))
   }
 }
