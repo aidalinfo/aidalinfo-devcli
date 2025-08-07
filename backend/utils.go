@@ -1,7 +1,9 @@
 package backend
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 
@@ -35,14 +37,44 @@ func LogToFrontend(level, msg string) {
 // execCommand exécute une commande et retourne une erreur si elle échoue
 func execCommand(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	output, err := cmd.CombinedOutput()
+	
+	// Créer un pipe pour capturer stdout et stderr
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		LogToFrontend("error", string(output))
 		return err
 	}
-	LogToFrontend("debug", string(output))
-	return nil
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	// Démarrer la commande
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	// Lire stdout en temps réel
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			LogToFrontend("info", scanner.Text())
+			fmt.Println(scanner.Text()) // Afficher aussi dans le terminal
+		}
+	}()
+
+	// Lire stderr en temps réel
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			LogToFrontend("warning", scanner.Text())
+			fmt.Println(scanner.Text()) // Afficher aussi dans le terminal
+		}
+	}()
+
+	// Attendre la fin de la commande
+	return cmd.Wait()
 }
+
 
 // execCommandOutput exécute une commande et retourne sa sortie
 func execCommandOutput(name string, args ...string) (string, error) {

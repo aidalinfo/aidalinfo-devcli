@@ -60,22 +60,28 @@ jobs:
         run: |
           case "${{ matrix.build.platform }}" in
             "linux/amd64")
-              wails build -platform linux/amd64 -tags webkit2_41 -o aidalinfo-cli_linux_amd64
+              wails build -platform linux/amd64 -tags webkit2_41
+              mv build/bin/aidalinfo-cli build/bin/aidalinfo-cli_linux_amd64
               ;;
             "darwin/amd64")
-              wails build -platform darwin/amd64 -o aidalinfo-cli_darwin_amd64
+              wails build -platform darwin/amd64
+              mv build/bin/aidalinfo-cli.app build/bin/aidalinfo-cli_darwin_amd64.app
               ;;
             "darwin/arm64")
-              wails build -platform darwin/arm64 -o aidalinfo-cli_darwin_arm64
+              wails build -platform darwin/arm64
+              mv build/bin/aidalinfo-cli.app build/bin/aidalinfo-cli_darwin_arm64.app
               ;;
             *)
-              wails build -platform ${{ matrix.build.platform }} -o aidalinfo-cli
+              wails build -platform ${{ matrix.build.platform }}
               ;;
           esac
 
       - name: Create release and upload artifacts
         uses: softprops/action-gh-release@v2
         with:
-          files: build/bin/**/*
+          files: |
+            build/bin/aidalinfo-cli_linux_amd64
+            build/bin/aidalinfo-cli_darwin_amd64.app
+            build/bin/aidalinfo-cli_darwin_arm64.app
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
