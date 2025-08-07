@@ -22,7 +22,11 @@ jobs:
             os: 'ubuntu-latest'
             build-tags: 'webkit2_41'
           - name: 'App'
-            platform: 'darwin/universal'
+            platform: 'darwin/amd64'
+            os: 'macos-latest'
+            build-tags: ''
+          - name: 'App'
+            platform: 'darwin/arm64'
             os: 'macos-latest'
             build-tags: ''
 
@@ -54,15 +58,24 @@ jobs:
 
       - name: Build
         run: |
-          if [ "${{ matrix.build.platform }}" = "linux/amd64" ]; then
-            wails build -platform linux/amd64 -tags webkit2_41
-          else
-            wails build -platform ${{ matrix.build.platform }}
-          fi
+          case "${{ matrix.build.platform }}" in
+            "linux/amd64")
+              wails build -platform linux/amd64 -tags webkit2_41 -o aidalinfo-cli_linux_amd64
+              ;;
+            "darwin/amd64")
+              wails build -platform darwin/amd64 -o aidalinfo-cli_darwin_amd64
+              ;;
+            "darwin/arm64")
+              wails build -platform darwin/arm64 -o aidalinfo-cli_darwin_arm64
+              ;;
+            *)
+              wails build -platform ${{ matrix.build.platform }} -o aidalinfo-cli
+              ;;
+          esac
 
       - name: Create release and upload artifacts
         uses: softprops/action-gh-release@v2
         with:
-          files: ./build/bin/*
+          files: build/bin/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
