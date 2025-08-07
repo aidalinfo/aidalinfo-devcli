@@ -115,6 +115,22 @@ func (a *App) PerformUpdate(downloadURL string) error {
 	
 	err = backend.PerformUpdate(tmpFile)
 	if err != nil {
+		// Si sudo est requis, émettre un événement spécifique
+		if err == backend.ErrSudoRequired {
+			runtime.EventsEmit(a.ctx, "update:sudo-required", tmpFile)
+			return err
+		}
+		return err
+	}
+	
+	runtime.EventsEmit(a.ctx, "update:complete")
+	return nil
+}
+
+// PerformUpdateWithSudo performs the update with sudo password
+func (a *App) PerformUpdateWithSudo(tmpFilePath string, password string) error {
+	err := backend.PerformUpdateWithPassword(tmpFilePath, password)
+	if err != nil {
 		return err
 	}
 	

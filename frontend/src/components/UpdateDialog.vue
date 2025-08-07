@@ -50,10 +50,18 @@
       </DialogFooter>
     </DialogContent>
   </Dialog>
+  
+  <!-- Dialog pour le mot de passe sudo -->
+  <SudoPasswordDialog
+    v-model="showSudoDialog"
+    :tmp-file-path="tmpFilePath"
+    @confirm="handleSudoPassword"
+    @cancel="handleSudoCancel"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import {
   Dialog,
   DialogContent,
@@ -63,7 +71,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { CheckForUpdates, PerformUpdate } from '../../wailsjs/go/main/App'
+import SudoPasswordDialog from './SudoPasswordDialog.vue'
+import { CheckForUpdates, PerformUpdate, PerformUpdateWithSudo } from '../../wailsjs/go/main/App'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { toast } from 'vue-sonner'
 
@@ -83,6 +92,8 @@ const isDownloading = ref(false)
 const downloadProgress = ref(0)
 const updateError = ref('')
 const updateSuccess = ref(false)
+const showSudoDialog = ref(false)
+const tmpFilePath = ref('')
 
 watch(() => props.modelValue, (newVal) => {
   isOpen.value = newVal
@@ -108,6 +119,33 @@ const checkForUpdates = async () => {
   }
 }
 
+// Écouter l'événement sudo-required
+onMounted(() => {
+  EventsOn('update:sudo-required', (filePath: string) => {
+    tmpFilePath.value = filePath
+    showSudoDialog.value = true
+    isDownloading.value = false
+  })
+  
+  EventsOn('update:complete', () => {
+    updateSuccess.value = true
+    showSudoDialog.value = false
+    toast.success('Mise à jour réussie! L\'application va redémarrer...')
+    
+    // Attendre un peu avant de fermer
+    setTimeout(() => {
+      isOpen.value = false
+      // L'application devrait redémarrer automatiquement
+    }, 3000)
+  })
+})
+
+onUnmounted(() => {
+  EventsOff('update:sudo-required')
+  EventsOff('update:complete')
+  EventsOff('update:progress')
+})
+
 const performUpdate = async () => {
   if (!downloadURL.value) return
   
@@ -122,22 +160,34 @@ const performUpdate = async () => {
     })
     
     await PerformUpdate(downloadURL.value)
+    // Si sudo est requis, l'événement sera émis et le dialogue s'ouvrira
     
-    updateSuccess.value = true
-    toast.success('Mise à jour réussie! L\'application va redémarrer...')
-    
-    // Attendre un peu avant de fermer
-    setTimeout(() => {
-      isOpen.value = false
-      // L'application devrait redémarrer automatiquement
-    }, 3000)
-    
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erreur lors de la mise à jour:', error)
-    updateError.value = `Échec de la mise à jour: ${error}`
+    // Si c'est une erreur sudo_required, le dialogue s'ouvrira automatiquement
+    if (!error.message?.includes('sudo_required')) {
+      updateError.value = `Échec de la mise à jour: ${error}`
+      isDownloading.value = false
+    }
   } finally {
-    isDownloading.value = false
     EventsOff('update:progress')
   }
+}
+
+const handleSudoPassword = async (password: string, filePath: string) => {
+  try {
+    await PerformUpdateWithSudo(filePath, password)
+    showSudoDialog.value = false
+    // L'événement update:complete sera émis par le backend
+  } catch (error: any) {
+    // Propager l'erreur au composant SudoPasswordDialog
+    throw error
+  }
+}
+
+const handleSudoCancel = () => {
+  showSudoDialog.value = false
+  isDownloading.value = false
+  updateError.value = 'Mise à jour annulée par l\'utilisateur'
 }
 </script>
