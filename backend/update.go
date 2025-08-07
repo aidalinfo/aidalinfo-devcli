@@ -15,7 +15,7 @@ import (
 
 const (
 	REPO_URL        = "https://github.com/aidalinfo/aidalinfo-devcli"
-	CURRENT_VERSION = "v0.0.14.3"
+	CURRENT_VERSION = "v0.0.14.4"
 )
 
 type UpdateInfo struct {
@@ -188,7 +188,7 @@ func PerformUpdate(tmpFilePath string) error {
 }
 
 func GetLatestReleaseInfo() (map[string]interface{}, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/aidalinfo/aidalinfo-devcli/releases/latest")
+	url := "https://api.github.com/repos/aidalinfo/aidalinfo-devcli/releases/latest"
 
 	resp, err := http.Get(url)
 	if err != nil {
