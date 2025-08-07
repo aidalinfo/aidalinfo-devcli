@@ -15,7 +15,7 @@ import (
 
 const (
 	REPO_URL        = "https://github.com/aidalinfo/aidalinfo-devcli"
-	CURRENT_VERSION = "v0.0.14"
+	CURRENT_VERSION = "v0.0.14.1"
 )
 
 type UpdateInfo struct {
