@@ -79,9 +79,6 @@ jobs:
       - name: Create release and upload artifacts
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            build/bin/aidalinfo-cli_linux_amd64
-            build/bin/aidalinfo-cli_darwin_amd64.app
-            build/bin/aidalinfo-cli_darwin_arm64.app
+          files: build/bin/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
