@@ -154,24 +154,32 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 	}
 	defer os.Remove(dumpFile)
 	
-	// Étape 2: Si dropExisting, supprimer la base de destination si elle existe
+	// Étape 2: Gérer la base de données de destination
+	createDbArgs := []string{
+		"-h", destHost,
+		"-P", destPort,
+		"-u", destUser,
+	}
+	if destPassword != "" {
+		createDbArgs = append(createDbArgs, fmt.Sprintf("-p%s", destPassword))
+	}
+	
 	if dropExisting {
-		LogToFrontend("info", fmt.Sprintf("Suppression de la base %s sur le serveur de destination...", database))
-		dropArgs := []string{
-			"-h", destHost,
-			"-P", destPort,
-			"-u", destUser,
-		}
-		if destPassword != "" {
-			dropArgs = append(dropArgs, fmt.Sprintf("-p%s", destPassword))
-		}
-		dropArgs = append(dropArgs, "-e", fmt.Sprintf("DROP DATABASE IF EXISTS `%s`; CREATE DATABASE `%s`;", database, database))
-		
+		LogToFrontend("info", fmt.Sprintf("Suppression de la base %s sur le serveur de destination si elle existe...", database))
+		dropArgs := append(createDbArgs, "-e", fmt.Sprintf("DROP DATABASE IF EXISTS `%s`;", database))
 		cmdDrop := exec.Command("mysql", dropArgs...)
 		if err := cmdDrop.Run(); err != nil {
-			LogToFrontend("warn", fmt.Sprintf("Impossible de recréer la base: %v", err))
-			// On continue quand même, la base existe peut-être déjà
+			LogToFrontend("warn", fmt.Sprintf("Impossible de supprimer la base: %v", err))
 		}
+	}
+	
+	// Toujours créer la base si elle n'existe pas
+	LogToFrontend("info", fmt.Sprintf("Création de la base %s si elle n'existe pas...", database))
+	createArgs := append(createDbArgs, "-e", fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", database))
+	cmdCreate := exec.Command("mysql", createArgs...)
+	if err := cmdCreate.Run(); err != nil {
+		LogToFrontend("error", fmt.Sprintf("Impossible de créer la base: %v", err))
+		return fmt.Errorf("impossible de créer la base de données: %v", err)
 	}
 	
 	// Étape 3: Restaurer sur la destination
