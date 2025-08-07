@@ -65,11 +65,13 @@ jobs:
               ;;
             "darwin/amd64")
               wails build -platform darwin/amd64
-              mv build/bin/aidalinfo-cli.app build/bin/aidalinfo-cli_darwin_amd64.app
+              cd build/bin
+              tar -czf aidalinfo-cli_darwin_amd64.tar.gz aidalinfo-cli.app
               ;;
             "darwin/arm64")
               wails build -platform darwin/arm64
-              mv build/bin/aidalinfo-cli.app build/bin/aidalinfo-cli_darwin_arm64.app
+              cd build/bin
+              tar -czf aidalinfo-cli_darwin_arm64.tar.gz aidalinfo-cli.app
               ;;
             *)
               wails build -platform ${{ matrix.build.platform }}
@@ -82,7 +84,7 @@ jobs:
         with:
           files: |
             build/bin/aidalinfo-cli_linux_amd64
-            build/bin/aidalinfo-cli_darwin_amd64.app
-            build/bin/aidalinfo-cli_darwin_arm64.app
+            build/bin/aidalinfo-cli_darwin_amd64.tar.gz
+            build/bin/aidalinfo-cli_darwin_arm64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
