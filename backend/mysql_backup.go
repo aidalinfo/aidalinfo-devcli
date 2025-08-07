@@ -166,7 +166,9 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 	
 	if dropExisting {
 		LogToFrontend("info", fmt.Sprintf("Suppression de la base %s sur le serveur de destination si elle existe...", database))
-		dropArgs := append(createDbArgs, "-e", fmt.Sprintf("DROP DATABASE IF EXISTS `%s`;", database))
+		dropArgs := make([]string, len(createDbArgs))
+		copy(dropArgs, createDbArgs)
+		dropArgs = append(dropArgs, "-e", fmt.Sprintf("DROP DATABASE IF EXISTS `%s`;", database))
 		cmdDrop := exec.Command("mysql", dropArgs...)
 		if err := cmdDrop.Run(); err != nil {
 			LogToFrontend("warn", fmt.Sprintf("Impossible de supprimer la base: %v", err))
@@ -175,11 +177,13 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 	
 	// Toujours créer la base si elle n'existe pas
 	LogToFrontend("info", fmt.Sprintf("Création de la base %s si elle n'existe pas...", database))
-	createArgs := append(createDbArgs, "-e", fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", database))
+	createArgs := make([]string, len(createDbArgs))
+	copy(createArgs, createDbArgs)
+	createArgs = append(createArgs, "-e", fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", database))
 	cmdCreate := exec.Command("mysql", createArgs...)
-	if err := cmdCreate.Run(); err != nil {
-		LogToFrontend("error", fmt.Sprintf("Impossible de créer la base: %v", err))
-		return fmt.Errorf("impossible de créer la base de données: %v", err)
+	if output, err := cmdCreate.CombinedOutput(); err != nil {
+		LogToFrontend("error", fmt.Sprintf("Impossible de créer la base %s: %v - Output: %s", database, err, string(output)))
+		return fmt.Errorf("impossible de créer la base de données %s: %v", database, err)
 	}
 	
 	// Étape 3: Restaurer sur la destination
@@ -187,23 +191,19 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 	
 	// Décompresser et restaurer
 	cmdGunzip := exec.Command("gunzip", "-c", dumpFile)
-	cmdMysql := exec.Command("mysql",
+	
+	// Construire les arguments mysql
+	mysqlArgs := []string{
 		"-h", destHost,
 		"-P", destPort,
 		"-u", destUser,
-		fmt.Sprintf("-p%s", destPassword),
-		database,
-	)
-	
-	// Si pas de password, ajuster les arguments
-	if destPassword == "" {
-		cmdMysql = exec.Command("mysql",
-			"-h", destHost,
-			"-P", destPort,
-			"-u", destUser,
-			database,
-		)
 	}
+	if destPassword != "" {
+		mysqlArgs = append(mysqlArgs, fmt.Sprintf("-p%s", destPassword))
+	}
+	mysqlArgs = append(mysqlArgs, database)
+	
+	cmdMysql := exec.Command("mysql", mysqlArgs...)
 	
 	// Connecter gunzip à mysql via pipe
 	pipe, err := cmdGunzip.StdoutPipe()
