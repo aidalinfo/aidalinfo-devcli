@@ -38,7 +38,7 @@ jobs:
           submodules: recursive
 
       - name: Build wails
-        uses: dAppServer/wails-build-action@v2.2
+        uses: dAppServer/wails-build-action@v3
         id: build
         with:
           build-name: ${{ matrix.build.name }}
@@ -48,7 +48,7 @@ jobs:
           build-tags: ${{ matrix.build.build-tags }}
 
       - name: Create release and upload artifacts
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.build.outputs.artifact }}
         env:
