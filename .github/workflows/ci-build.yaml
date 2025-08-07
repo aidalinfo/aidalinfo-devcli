@@ -65,10 +65,12 @@ jobs:
               ;;
             "darwin/amd64")
               wails build -platform darwin/amd64
+              ls -la build/bin/
               mv build/bin/aidalinfo-cli.app build/bin/aidalinfo-cli_darwin_amd64.app
               ;;
             "darwin/arm64")
               wails build -platform darwin/arm64
+              ls -la build/bin/
               mv build/bin/aidalinfo-cli.app build/bin/aidalinfo-cli_darwin_arm64.app
               ;;
             *)
@@ -76,9 +78,15 @@ jobs:
               ;;
           esac
 
+      - name: Debug files
+        run: |
+          echo "Files in build/bin/:"
+          ls -la build/bin/ || echo "build/bin/ doesn't exist"
+          find build/ -name "*.app" -o -name "aidalinfo-cli*" 2>/dev/null || echo "No files found"
+
       - name: Create release and upload artifacts
         uses: softprops/action-gh-release@v2
         with:
-          files: build/bin/*
+          files: build/bin/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
