@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Tag, Settings, Database, Wrench, Download } from 'lucide-vue-next'
+import { Tag, Settings, Database, Wrench, Download, GitMerge } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarContent,
@@ -33,12 +33,18 @@ const items = [
     title: 'Backup Management',
     route: '/backup',
     icon: Database,
+  },  
+  {
+    title: 'Merger Management',
+    route: '/merger',
+    icon: GitMerge,
   },
   {
     title: 'Settings',
     route: '/settings',
     icon: Settings,
   },
+
 ]
 
 const currentVersion = ref('1.0.0')

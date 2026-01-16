@@ -4,9 +4,27 @@
       <div class="flex items-center justify-between">
         <CardTitle class="text-lg">{{ submodule.name }}</CardTitle>
         <div class="flex items-center gap-2">
-          <Badge :variant="getBranchVariant(submodule.currentBranch)" class="text-xs">
-            {{ submodule.currentBranch }}
-          </Badge>
+          <Select 
+            :model-value="submodule.currentBranch"
+            @update:model-value="handleBranchChange"
+            @update:open="handleDropdownOpen">
+            <SelectTrigger class="w-[180px] h-8 text-xs">
+              <SelectValue :placeholder="submodule.currentBranch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Branches</SelectLabel>
+                <SelectItem v-if="submodule.branches && submodule.branches.length > 0" 
+                  v-for="branch in submodule.branches" :key="branch" :value="branch">
+                  {{ branch }}
+                </SelectItem>
+                <SelectItem v-else value="loading" disabled>
+                  Chargement...
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+
           <div v-if="submodule.lastCommits && submodule.lastCommits.length > 0"
             class="cursor-pointer p-1 rounded-full hover:bg-gray-100 transition-colors" :title="getLastCommitTooltip()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -45,14 +63,27 @@
     </CardContent>
 
     <CardFooter class="flex gap-2">
-      <Button @click="handleRcTag" variant="outline" size="sm" class="flex-1" :disabled="loading">
-        <span class="mr-1">🔄</span>
-        Tag RC
+      <Button @click="handleViewDiff" variant="outline" size="sm" class="flex-1" :disabled="loading || !submodule.pendingChanges">
+        <span class="mr-1">📄</span>
+        Changements <span v-if="getPendingChangesCount() > 0">({{ getPendingChangesCount() }})</span>
       </Button>
-      <Button @click="handleProdTag" variant="default" size="sm" class="flex-1" :disabled="loading">
-        <span class="mr-1">🚀</span>
-        Tag Prod
+      <Button @click="handleMergeToCycle" variant="default" size="sm" class="flex-1" :disabled="loading">
+        <span class="mr-1">🔀</span>
+        Merge to cycle
       </Button>
+      <Dialog v-model:open="diffDialogOpen">
+        <DialogContent class="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Modifications : {{ submodule.name }}</DialogTitle>
+            <DialogDescription>
+              Diff des fichiers modifiés
+            </DialogDescription>
+          </DialogHeader>
+          <div class="flex-1 overflow-auto bg-slate-950 p-4 rounded-md mt-2">
+            <pre class="text-xs text-green-400 font-mono whitespace-pre-wrap">{{ diffContent }}</pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </CardFooter>
   </Card>
 </template>
@@ -62,6 +93,8 @@ import { ref } from 'vue'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select'
+
 import type { backend } from '../../wailsjs/go/models'
 
 // Use the backend Commit type
@@ -76,6 +109,7 @@ interface Submodule {
   name: string
   path: string
   currentBranch: string
+  branches?: string[]
   gitStatus?: string
   lastCommits?: Commit[]
   tags?: Tags
@@ -88,10 +122,14 @@ interface Props {
 
 const props = defineProps<Props>()
 const loading = ref(false)
+const diffDialogOpen = ref(false)
+const diffContent = ref('')
 
 const emit = defineEmits<{
-  rcTag: [submodule: Submodule]
-  prodTag: [submodule: Submodule]
+  changeBranch: [submodule: Submodule, branch: string]
+  loadBranches: [submodule: Submodule]
+  viewDiff: [submodule: Submodule]
+  mergeToCycle: [submodule: Submodule]
 }>()
 
 const getBranchVariant = (branch: string) => {
@@ -100,6 +138,17 @@ const getBranchVariant = (branch: string) => {
   if (branch.startsWith('feature/')) return 'outline'
   if (branch.startsWith('hotfix/')) return 'destructive'
   return 'outline'
+}
+
+// ... existing code ...
+
+const handleMergeToCycle = () => {
+  emit('mergeToCycle', props.submodule)
+}
+
+const getPendingChangesCount = () => {
+  if (!props.submodule.pendingChanges) return 0
+  return props.submodule.pendingChanges.trim().split('\n').length
 }
 
 const formatDate = (dateStr: string) => {
@@ -125,11 +174,27 @@ const getLastCommitTooltip = () => {
   return `Dernier commit:\n${lastCommit.Author}\n${formatDate(lastCommit.Date)}\n${lastCommit.Message}`
 }
 
-const handleRcTag = () => {
-  emit('rcTag', props.submodule)
+
+
+const handleBranchChange = (branch: any) => {
+  emit('changeBranch', props.submodule, branch as string)
 }
 
-const handleProdTag = () => {
-  emit('prodTag', props.submodule)
+const handleDropdownOpen = (isOpen: boolean) => {
+  if (isOpen && (!props.submodule.branches || props.submodule.branches.length === 0)) {
+    emit('loadBranches', props.submodule)
+  }
 }
+
+const handleViewDiff = () => {
+  emit('viewDiff', props.submodule)
+}
+
+// Expose openDiffDialog to parent
+defineExpose({
+  openDiffDialog: (content: string) => {
+    diffContent.value = content
+    diffDialogOpen.value = true
+  }
+})
 </script>
