@@ -175,6 +175,14 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 	
 	// Toujours créer la base si elle n'existe pas
 	LogToFrontend("info", fmt.Sprintf("Création de la base %s si elle n'existe pas...", database))
+	createDbArgs := []string{
+		"-h", destHost,
+		"-P", destPort,
+		"-u", destUser,
+	}
+	if destPassword != "" {
+		createDbArgs = append(createDbArgs, fmt.Sprintf("-p%s", destPassword))
+	}
 	createArgs := make([]string, len(createDbArgs))
 	copy(createArgs, createDbArgs)
 	createArgs = append(createArgs, "-e", fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", database))
@@ -189,22 +197,21 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 
 	// Décompresser et restaurer
 	cmdGunzip := exec.Command("gunzip", "-c", dumpFile)
-	
-	// Construire les arguments mysql
-	mysqlArgs := []string{
+
+	cmdMysql := exec.Command("mysql",
 		"-h", destHost,
 		"-P", destPort,
 		"-u", destUser,
-		fmt.Sprintf("-p%s", destPassword),
 		database,
 	)
 
-	// Si pas de password, ajuster les arguments
-	if destPassword == "" {
+	// Ajouter le password si fourni
+	if destPassword != "" {
 		cmdMysql = exec.Command("mysql",
 			"-h", destHost,
 			"-P", destPort,
 			"-u", destUser,
+			fmt.Sprintf("-p%s", destPassword),
 			database,
 		)
 	}
