@@ -22,21 +22,21 @@ func ListMySQLDatabases(ctx context.Context, mysqlHost, mysqlPort, mysqlUser, my
 		"-P", mysqlPort,
 		"-u", mysqlUser,
 	}
-	
+
 	if mysqlPassword != "" {
 		args = append(args, fmt.Sprintf("-p%s", mysqlPassword))
 	}
-	
+
 	// Exécuter SHOW DATABASES
 	args = append(args, "-e", "SHOW DATABASES;", "--skip-column-names", "--batch")
-	
+
 	cmd := exec.Command("mysql", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		LogToFrontend("error", fmt.Sprintf("Erreur listing databases MySQL: %v", err))
 		return nil, fmt.Errorf("erreur listing databases MySQL: %v", err)
 	}
-	
+
 	// Parser la sortie pour obtenir la liste des bases
 	lines := strings.Split(string(output), "\n")
 	var databases []string
@@ -47,7 +47,7 @@ func ListMySQLDatabases(ctx context.Context, mysqlHost, mysqlPort, mysqlUser, my
 			databases = append(databases, line)
 		}
 	}
-	
+
 	return databases, nil
 }
 
@@ -77,9 +77,8 @@ func DumpMySQLDatabase(ctx context.Context, mysqlHost, mysqlPort, mysqlUser, mys
 		"--events",
 		database,
 	}
-	
+
 	if mysqlPassword != "" {
-		args = append([]string{fmt.Sprintf("-p%s", mysqlPassword)}, args...)
 		// Réorganiser pour mettre le password avant les autres options
 		args = []string{
 			"-h", mysqlHost,
@@ -95,18 +94,18 @@ func DumpMySQLDatabase(ctx context.Context, mysqlHost, mysqlPort, mysqlUser, mys
 	}
 
 	LogToFrontend("info", fmt.Sprintf("Création du dump de la base MySQL %s...", database))
-	
+
 	// Utiliser mysqldump avec pipe vers gzip
 	cmdDump := exec.Command("mysqldump", args...)
 	cmdGzip := exec.Command("gzip", "-c")
-	
+
 	// Connecter la sortie de mysqldump à l'entrée de gzip
 	pipe, err := cmdDump.StdoutPipe()
 	if err != nil {
 		return "", fmt.Errorf("erreur création pipe: %v", err)
 	}
 	cmdGzip.Stdin = pipe
-	
+
 	// Rediriger la sortie de gzip vers le fichier
 	outFile, err := os.Create(tmpFilePath)
 	if err != nil {
@@ -114,7 +113,7 @@ func DumpMySQLDatabase(ctx context.Context, mysqlHost, mysqlPort, mysqlUser, mys
 	}
 	defer outFile.Close()
 	cmdGzip.Stdout = outFile
-	
+
 	// Démarrer les commandes
 	if err := cmdGzip.Start(); err != nil {
 		return "", fmt.Errorf("erreur démarrage gzip: %v", err)
@@ -122,7 +121,7 @@ func DumpMySQLDatabase(ctx context.Context, mysqlHost, mysqlPort, mysqlUser, mys
 	if err := cmdDump.Start(); err != nil {
 		return "", fmt.Errorf("erreur démarrage mysqldump: %v", err)
 	}
-	
+
 	// Attendre la fin des commandes
 	if err := cmdDump.Wait(); err != nil {
 		os.Remove(tmpFilePath)
@@ -130,7 +129,7 @@ func DumpMySQLDatabase(ctx context.Context, mysqlHost, mysqlPort, mysqlUser, mys
 		return "", fmt.Errorf("erreur mysqldump: %v", err)
 	}
 	pipe.Close()
-	
+
 	if err := cmdGzip.Wait(); err != nil {
 		os.Remove(tmpFilePath)
 		LogToFrontend("error", fmt.Sprintf("Erreur gzip: %v", err))
@@ -142,38 +141,37 @@ func DumpMySQLDatabase(ctx context.Context, mysqlHost, mysqlPort, mysqlUser, mys
 }
 
 // TransferMySQLDatabase transfère une base de données entre deux serveurs MySQL
-func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUser, sourcePassword, 
+func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUser, sourcePassword,
 	destHost, destPort, destUser, destPassword, database string, dropExisting bool) error {
-	
+
 	LogToFrontend("info", fmt.Sprintf("Début du transfert de la base MySQL %s", database))
-	
+
 	// Étape 1: Créer le dump de la source
 	dumpFile, err := DumpMySQLDatabase(ctx, sourceHost, sourcePort, sourceUser, sourcePassword, database)
 	if err != nil {
 		return fmt.Errorf("erreur création dump: %v", err)
 	}
 	defer os.Remove(dumpFile)
-	
-	// Étape 2: Gérer la base de données de destination
-	createDbArgs := []string{
-		"-h", destHost,
-		"-P", destPort,
-		"-u", destUser,
-	}
-	if destPassword != "" {
-		createDbArgs = append(createDbArgs, fmt.Sprintf("-p%s", destPassword))
-	}
-	
+
+	// Étape 2: Si dropExisting, supprimer la base de destination si elle existe
 	if dropExisting {
-		LogToFrontend("info", fmt.Sprintf("Suppression de la base %s sur le serveur de destination si elle existe...", database))
-		dropArgs := make([]string, len(createDbArgs))
-		copy(dropArgs, createDbArgs)
-		dropArgs = append(dropArgs, "-e", fmt.Sprintf("DROP DATABASE IF EXISTS `%s`;", database))
+		LogToFrontend("info", fmt.Sprintf("Suppression de la base %s sur le serveur de destination...", database))
+		dropArgs := []string{
+			"-h", destHost,
+			"-P", destPort,
+			"-u", destUser,
+		}
+		if destPassword != "" {
+			dropArgs = append(dropArgs, fmt.Sprintf("-p%s", destPassword))
+		}
+		dropArgs = append(dropArgs, "-e", fmt.Sprintf("DROP DATABASE IF EXISTS `%s`; CREATE DATABASE `%s`;", database, database))
+
 		cmdDrop := exec.Command("mysql", dropArgs...)
 		if err := cmdDrop.Run(); err != nil {
 			LogToFrontend("warn", fmt.Sprintf("Impossible de supprimer la base: %v", err))
 		}
 	}
+
 	
 	// Toujours créer la base si elle n'existe pas
 	LogToFrontend("info", fmt.Sprintf("Création de la base %s si elle n'existe pas...", database))
@@ -188,7 +186,7 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 	
 	// Étape 3: Restaurer sur la destination
 	LogToFrontend("info", fmt.Sprintf("Restauration de %s sur le serveur MySQL de destination...", database))
-	
+
 	// Décompresser et restaurer
 	cmdGunzip := exec.Command("gunzip", "-c", dumpFile)
 	
@@ -197,14 +195,20 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 		"-h", destHost,
 		"-P", destPort,
 		"-u", destUser,
+		fmt.Sprintf("-p%s", destPassword),
+		database,
+	)
+
+	// Si pas de password, ajuster les arguments
+	if destPassword == "" {
+		cmdMysql = exec.Command("mysql",
+			"-h", destHost,
+			"-P", destPort,
+			"-u", destUser,
+			database,
+		)
 	}
-	if destPassword != "" {
-		mysqlArgs = append(mysqlArgs, fmt.Sprintf("-p%s", destPassword))
-	}
-	mysqlArgs = append(mysqlArgs, database)
-	
-	cmdMysql := exec.Command("mysql", mysqlArgs...)
-	
+
 	// Connecter gunzip à mysql via pipe
 	pipe, err := cmdGunzip.StdoutPipe()
 	if err != nil {
@@ -213,7 +217,7 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 	cmdMysql.Stdin = pipe
 	cmdMysql.Stdout = os.Stdout
 	cmdMysql.Stderr = os.Stderr
-	
+
 	// Démarrer les commandes
 	if err := cmdMysql.Start(); err != nil {
 		return fmt.Errorf("erreur démarrage mysql: %v", err)
@@ -221,36 +225,36 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 	if err := cmdGunzip.Start(); err != nil {
 		return fmt.Errorf("erreur démarrage gunzip: %v", err)
 	}
-	
+
 	// Attendre la fin
 	if err := cmdGunzip.Wait(); err != nil {
 		LogToFrontend("error", fmt.Sprintf("Erreur gunzip: %v", err))
 		return fmt.Errorf("erreur gunzip: %v", err)
 	}
 	pipe.Close()
-	
+
 	if err := cmdMysql.Wait(); err != nil {
 		LogToFrontend("error", fmt.Sprintf("Erreur mysql restore: %v", err))
 		return fmt.Errorf("erreur mysql restore: %v", err)
 	}
-	
+
 	LogToFrontend("success", fmt.Sprintf("Transfert MySQL de %s terminé avec succès", database))
 	return nil
 }
 
 // RestoreMySQLBackup télécharge un backup S3 et le restaure dans MySQL
 func RestoreMySQLBackup(ctx context.Context, creds S3Credentials, s3Path string, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, database string) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	objectName := s3Path
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	presignedURL, err := generatePresignedURL(ctx, client, bucket, objectName)
@@ -306,7 +310,7 @@ func RestoreMySQLBackup(ctx context.Context, creds S3Credentials, s3Path string,
 		createDbArgs = append(createDbArgs, fmt.Sprintf("-p%s", mysqlPassword))
 	}
 	createDbArgs = append(createDbArgs, "-e", fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", database))
-	
+
 	cmdCreateDb := exec.Command("mysql", createDbArgs...)
 	if err := cmdCreateDb.Run(); err != nil {
 		LogToFrontend("warn", fmt.Sprintf("Impossible de créer la base: %v", err))
@@ -314,7 +318,7 @@ func RestoreMySQLBackup(ctx context.Context, creds S3Credentials, s3Path string,
 
 	// Restaurer le backup
 	LogToFrontend("info", "Début de la restauration MySQL...")
-	
+
 	// Décompresser et restaurer
 	cmdGunzip := exec.Command("gunzip", "-c", tmpFile.Name())
 	cmdMysql := exec.Command("mysql",
@@ -323,7 +327,7 @@ func RestoreMySQLBackup(ctx context.Context, creds S3Credentials, s3Path string,
 		"-u", mysqlUser,
 		database,
 	)
-	
+
 	if mysqlPassword != "" {
 		cmdMysql = exec.Command("mysql",
 			"-h", mysqlHost,
@@ -333,7 +337,7 @@ func RestoreMySQLBackup(ctx context.Context, creds S3Credentials, s3Path string,
 			database,
 		)
 	}
-	
+
 	// Connecter gunzip à mysql via pipe
 	pipe, err := cmdGunzip.StdoutPipe()
 	if err != nil {
@@ -342,7 +346,7 @@ func RestoreMySQLBackup(ctx context.Context, creds S3Credentials, s3Path string,
 	cmdMysql.Stdin = pipe
 	cmdMysql.Stdout = os.Stdout
 	cmdMysql.Stderr = os.Stderr
-	
+
 	// Démarrer les commandes
 	if err := cmdMysql.Start(); err != nil {
 		return fmt.Errorf("erreur démarrage mysql: %v", err)
@@ -350,19 +354,19 @@ func RestoreMySQLBackup(ctx context.Context, creds S3Credentials, s3Path string,
 	if err := cmdGunzip.Start(); err != nil {
 		return fmt.Errorf("erreur démarrage gunzip: %v", err)
 	}
-	
+
 	// Attendre la fin
 	if err := cmdGunzip.Wait(); err != nil {
 		LogToFrontend("error", fmt.Sprintf("Erreur gunzip: %v", err))
 		return fmt.Errorf("erreur gunzip: %v", err)
 	}
 	pipe.Close()
-	
+
 	if err := cmdMysql.Wait(); err != nil {
 		LogToFrontend("error", fmt.Sprintf("Erreur mysql restore: %v", err))
 		return fmt.Errorf("erreur mysql restore: %v", err)
 	}
-	
+
 	LogToFrontend("success", "Restauration MySQL terminée avec succès.")
 	return nil
 }
@@ -374,18 +378,18 @@ func TestMySQLConnection(ctx context.Context, mysqlHost, mysqlPort, mysqlUser, m
 		"-P", mysqlPort,
 		"-u", mysqlUser,
 	}
-	
+
 	if mysqlPassword != "" {
 		args = append(args, fmt.Sprintf("-p%s", mysqlPassword))
 	}
-	
+
 	// Tester avec une simple requête SELECT 1
 	args = append(args, "-e", "SELECT 1;", "--batch")
-	
+
 	cmd := exec.Command("mysql", args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("échec de la connexion MySQL: %v", err)
 	}
-	
+
 	return nil
 }

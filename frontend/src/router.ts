@@ -26,6 +26,11 @@ const routes: RouteRecordRaw[] = [
     name: "Backup",
     component: () => import("@/pages/backup.vue"),
   },
+  {
+    path: "/merger",
+    name: "Merger",
+    component: () => import("@/pages/Merger.vue"),
+  },
   // Ajoute d'autres routes ici
 ];
 

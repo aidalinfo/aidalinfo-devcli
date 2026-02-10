@@ -22,11 +22,11 @@ jobs:
             os: 'ubuntu-latest'
             build-tags: 'webkit2_41'
           - name: 'App'
-            platform: 'windows/amd64'
-            os: 'windows-latest'
+            platform: 'darwin/amd64'
+            os: 'macos-latest'
             build-tags: ''
           - name: 'App'
-            platform: 'darwin/universal'
+            platform: 'darwin/arm64'
             os: 'macos-latest'
             build-tags: ''
 
@@ -37,19 +37,54 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build wails
-        uses: dAppServer/wails-build-action@v2.2
-        id: build
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          build-name: ${{ matrix.build.name }}
-          build-platform: ${{ matrix.build.platform }}
-          package: false
           go-version: '1.23.4'
-          build-tags: ${{ matrix.build.build-tags }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install Linux dependencies
+        if: matrix.build.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Build
+        run: |
+          case "${{ matrix.build.platform }}" in
+            "linux/amd64")
+              wails build -platform linux/amd64 -tags webkit2_41
+              mv build/bin/aidalinfo-cli build/bin/aidalinfo-cli_linux_amd64
+              ;;
+            "darwin/amd64")
+              wails build -platform darwin/amd64
+              cd build/bin
+              tar -czf aidalinfo-cli_darwin_amd64.tar.gz aidalinfo-cli.app
+              ;;
+            "darwin/arm64")
+              wails build -platform darwin/arm64
+              cd build/bin
+              tar -czf aidalinfo-cli_darwin_arm64.tar.gz aidalinfo-cli.app
+              ;;
+            *)
+              wails build -platform ${{ matrix.build.platform }}
+              ;;
+          esac
+
 
       - name: Create release and upload artifacts
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.build.outputs.artifact }}
+          files: |
+            build/bin/aidalinfo-cli_linux_amd64
+            build/bin/aidalinfo-cli_darwin_amd64.tar.gz
+            build/bin/aidalinfo-cli_darwin_arm64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

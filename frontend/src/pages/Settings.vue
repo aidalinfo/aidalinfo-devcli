@@ -1,6 +1,18 @@
 <template>
   <Card class="mx-5 mt-10">
     <CardHeader>
+      <CardTitle>Backup Repository Server</CardTitle>
+      <CardDescription>
+        Sélectionnez le serveur S3 utilisé pour récupérer les backups.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <BackupRepositoryServerManager />
+    </CardContent>
+  </Card>
+
+  <Card class="mx-5 mt-10">
+    <CardHeader>
       <CardTitle>Serveurs S3/MinIO</CardTitle>
       <CardDescription>
         Gérez vos différents serveurs S3 et MinIO pour les backups et restaurations.
@@ -50,6 +62,7 @@
 
 <script setup lang="ts">
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import BackupRepositoryServerManager from '@/components/BackupRepositoryServerManager.vue'
 import MongoServerManager from '@/components/MongoServerManager.vue'
 import MySQLServerManager from '@/components/MySQLServerManager.vue'
 import PostgresServerManager from '@/components/PostgresServerManager.vue'

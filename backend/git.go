@@ -92,24 +92,30 @@ func GitStatus(submodule string) string {
 	return string(output)
 }
 
-
 // Fonction pour obtenir la liste des branches disponibles
 func GetBranches(path string) []string {
 	// Effectuer un git fetch pour récupérer les branches distantes
 	fetchCmd := exec.Command("git", "-C", path, "fetch", "--all", "--prune")
 	if err := fetchCmd.Run(); err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur lors du fetch pour %s : %s", path, err.Error()))
 		return []string{fmt.Sprintf("Erreur lors du fetch : %s", err.Error())}
 	}
 	cmd := exec.Command("git", "-C", path, "branch", "-a", "--list")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur lors de la récupération des branches pour %s : %s", path, err.Error()))
 		return []string{fmt.Sprintf("Erreur : %s", err.Error())}
 	}
 	branches := strings.Split(string(output), "\n")
-	for i := range branches {
-		branches[i] = strings.TrimSpace(branches[i])
+	var cleanBranches []string
+	for _, branch := range branches {
+		trimmed := strings.TrimSpace(branch)
+		if trimmed != "" {
+			cleanBranches = append(cleanBranches, trimmed)
+		}
 	}
-	return branches
+
+	return cleanBranches
 }
 
 // Fonction pour effectuer un merge
@@ -287,7 +293,7 @@ func CreateTag(repoPath, version, message string) error {
 }
 
 // Fonction pour récupérer les modifications en attente
-func getWaitingChanges(repoPath string) (string, error) {
+func GetPendingChanges(repoPath string) (string, error) {
 	cmd := exec.Command("git", "-C", repoPath, "status", "--porcelain")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -296,7 +302,7 @@ func getWaitingChanges(repoPath string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-func changeBranche(repoPath, branch string) error {
+func ChangeBranche(repoPath, branch string) error {
 	cmd := exec.Command("git", "-C", repoPath, "checkout", branch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -305,8 +311,18 @@ func changeBranche(repoPath, branch string) error {
 	return nil
 }
 
-
 type TagsResult struct {
 	VTags  []string `json:"vTags"`
 	RcTags []string `json:"rcTags"`
+}
+
+// GetDiff récupère le diff des modifications en attente
+func GetDiff(repoPath string) (string, error) {
+	// On récupère le diff des fichiers modifiés (non stagés et stagés)
+	cmd := exec.Command("git", "-C", repoPath, "diff", "HEAD")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("Erreur lors de la récupération du diff : %s\n%s", err, string(output))
+	}
+	return string(output), nil
 }

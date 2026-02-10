@@ -55,6 +55,18 @@ func (a *App) GetBranches(path string) []string {
 	return backend.GetBranches(path)
 }
 
+func (a *App) ChangeBranch(path, branch string) error {
+	return backend.ChangeBranche(path, branch)
+}
+
+func (a *App) GetDiff(path string) (string, error) {
+	return backend.GetDiff(path)
+}
+
+func (a *App) GetPendingChanges(path string) (string, error) {
+	return backend.GetPendingChanges(path)
+}
+
 func (a *App) GetLastCommits(submodules []string) ([]backend.Commit, error) {
 	return backend.GetLastCommits(submodules)
 }
@@ -112,12 +124,12 @@ func (a *App) PerformUpdate(downloadURL string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	err = backend.PerformUpdate(tmpFile)
 	if err != nil {
 		return err
 	}
-	
+
 	runtime.EventsEmit(a.ctx, "update:complete")
 	return nil
 }
