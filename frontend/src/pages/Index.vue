@@ -1,151 +1,19 @@
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
-import { toast } from 'vue-sonner'
+import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import SubmoduleCard from '@/components/SubmoduleCard.vue'
 import TagDialog from '@/components/TagDialog.vue'
-import { ListSubmodules, CleanSubmodules, GetCurrentBranch, GitStatus, GetLastCommits, GetLastTags } from '@/../wailsjs/go/main/App'
-import type { backend } from '@/../wailsjs/go/models'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { useSubmodules, type Submodule } from '@/composables/useSubmodules'
 
-// Use the backend Commit type
-// ...existing code...
-type Commit = backend.Commit
-
-interface Tags {
-  vTags: string[]
-  rcTags: string[]
-}
-
-interface Submodule {
-  name: string
-  path: string
-  currentBranch: string
-  gitStatus?: string
-  lastCommits?: Commit[]
-  tags?: Tags
-  pendingChanges?: string
-}
-
-const scanPath = ref('')
-const submodules = ref<Submodule[]>([])
-const loading = ref(false)
-const error = ref('')
+const { scanPath, submodules, loading, error, scanSubmodules } = useSubmodules()
 
 // TagDialog state
 const tagDialogOpen = ref(false)
 const selectedSubmodule = ref<Submodule | null>(null)
 const tagType = ref<'rc' | 'prod'>('rc')
-
-// Load cached path on mount
-onMounted(() => {
-  const cachedPath = localStorage.getItem('aidalinfo-scan-path')
-  if (cachedPath) {
-    scanPath.value = cachedPath
-  }
-})
-
-const savePath = () => {
-  if (scanPath.value) {
-    localStorage.setItem('aidalinfo-scan-path', scanPath.value)
-  }
-}
-
-const scanSubmodules = async () => {
-  if (!scanPath.value.trim()) {
-    toast.error('Veuillez entrer un chemin à scanner')
-    return
-  }
-
-  loading.value = true
-  
-  try {
-    // Save path to cache
-    savePath()
-    
-    // Get submodule paths
-    const submodulePaths = await ListSubmodules(scanPath.value)
-    const submoduleNames = await CleanSubmodules(submodulePaths)
-    
-    // Get detailed info for each submodule
-    const detailedSubmodules: Submodule[] = []
-    
-    for (let i = 0; i < submodulePaths.length; i++) {
-      const path = submodulePaths[i]
-      const name = submoduleNames[i]
-      
-      try {
-        const currentBranch = await GetCurrentBranch(path)
-        const gitStatus = await GitStatus(path)
-        
-        detailedSubmodules.push({
-          name,
-          path,
-          currentBranch: currentBranch || 'unknown',
-          gitStatus: gitStatus || undefined
-        })
-      } catch (err) {
-        console.error(`Error getting info for ${name}:`, err)
-        detailedSubmodules.push({
-          name,
-          path,
-          currentBranch: 'error',
-          gitStatus: `Error: ${err}`
-        })
-      }
-    }
-    
-    // Get last commits for all submodules
-    try {
-      const commits = await GetLastCommits(submodulePaths)
-      
-      // Group commits by submodule
-      const commitsBySubmodule = commits.reduce((acc, commit) => {
-        if (!acc[commit.Submodule]) {
-          acc[commit.Submodule] = []
-        }
-        acc[commit.Submodule].push(commit)
-        return acc
-      }, {} as Record<string, Commit[]>)
-      
-      // Add commits to submodules
-      detailedSubmodules.forEach(submodule => {
-        submodule.lastCommits = commitsBySubmodule[submodule.name] || []
-      })
-    } catch (err) {
-      console.error('Error getting commits:', err)
-    }
-    
-    // Get tags for each submodule
-    for (const submodule of detailedSubmodules) {
-      try {
-        const tagsResult = await GetLastTags(submodule.path)
-        submodule.tags = {
-          vTags: Array.isArray(tagsResult.vTags) ? tagsResult.vTags : [],
-          rcTags: Array.isArray(tagsResult.rcTags) ? tagsResult.rcTags : []
-        }
-      } catch (err) {
-        console.error(`Error getting tags for ${submodule.name}:`, err)
-        submodule.tags = {
-          vTags: [],
-          rcTags: []
-        }
-      }
-    }
-    
-    submodules.value = detailedSubmodules
-    toast.success(`Scan terminé: ${detailedSubmodules.length} submodules trouvés`)
-    
-  } catch (err) {
-    console.error('Error scanning submodules:', err)
-    toast.error(`Erreur lors du scan: ${err}`)
-  } finally {
-    loading.value = false
-  }
-}
 
 const handleRcTag = (submodule: Submodule) => {
   selectedSubmodule.value = submodule

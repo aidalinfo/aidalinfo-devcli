@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -25,6 +26,68 @@ const S3Region = "fr-par"
 type S3Credentials struct {
 	AccessKey string `json:"accessKey"`
 	SecretKey string `json:"secretKey"`
+	Host      string `json:"host"`
+	Port      string `json:"port"`
+	Region    string `json:"region"`
+	UseHttps  bool   `json:"useHttps"`
+	Bucket    string `json:"bucket"`
+}
+
+func resolveS3Config(creds S3Credentials) (bucket string, region string, endpoint string) {
+	bucket = strings.TrimSpace(creds.Bucket)
+	if bucket == "" {
+		bucket = "backup-global"
+	}
+
+	host := strings.TrimSpace(creds.Host)
+	if host == "" {
+		host = S3BaseURL
+	}
+	host = strings.TrimPrefix(host, "http://")
+	host = strings.TrimPrefix(host, "https://")
+	host = strings.TrimSuffix(host, "/")
+
+	hostOnly := host
+	hostPort := ""
+	if h, p, err := net.SplitHostPort(host); err == nil {
+		hostOnly = h
+		hostPort = p
+	}
+
+	region = strings.TrimSpace(creds.Region)
+	if region == "" {
+		region = S3Region
+	}
+
+	port := strings.TrimSpace(creds.Port)
+	if port == "" {
+		port = hostPort
+	}
+
+	useHttps := creds.UseHttps
+	if creds.Host == "" && port == "" {
+		useHttps = true
+	}
+	protocol := "https"
+	if !useHttps {
+		protocol = "http"
+	}
+
+	defaultPort := "80"
+	if useHttps {
+		defaultPort = "443"
+	}
+	if port == defaultPort {
+		port = ""
+	}
+
+	endpointHost := hostOnly
+	if port != "" {
+		endpointHost = net.JoinHostPort(hostOnly, port)
+	}
+
+	endpoint = fmt.Sprintf("%s://%s", protocol, endpointHost)
+	return bucket, region, endpoint
 }
 
 // BackupInfo structure for frontend (nom, taille, date)
@@ -36,17 +99,17 @@ type BackupInfo struct {
 
 // ListBackupsWithCreds liste les backups S3 avec infos (nom, taille, date) - exclut les backups Glacier
 func ListBackupsWithCreds(ctx context.Context, creds S3Credentials, s3Dir string) ([]BackupInfo, error) {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	prefix := s3Dir
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	var files []BackupInfo
@@ -213,17 +276,17 @@ func downloadWithRetry(url string, maxAttempts int, timeout time.Duration) (io.R
 
 // DownloadBackupWithCreds télécharge un backup S3 avec credentials fournis (bucket privé, signature S3 via AWS SDK)
 func DownloadBackupWithCreds(ctx context.Context, creds S3Credentials, s3Path, destPath string) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	objectName := s3Path
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	getObjInput := &s3.GetObjectInput{
@@ -235,7 +298,20 @@ func DownloadBackupWithCreds(ctx context.Context, creds S3Credentials, s3Path, d
 		return fmt.Errorf("erreur téléchargement S3: %v", err)
 	}
 	defer resp.Body.Close()
-	f, err := os.Create(destPath)
+
+	downloadPath := destPath
+	if !filepath.IsAbs(destPath) {
+		downloadsDir, err := getUserDownloadsDir()
+		if err != nil {
+			return fmt.Errorf("erreur récupération dossier Downloads: %v", err)
+		}
+		downloadPath = filepath.Join(downloadsDir, destPath)
+	}
+	if err := os.MkdirAll(filepath.Dir(downloadPath), 0o755); err != nil {
+		return fmt.Errorf("erreur création dossier de destination: %v", err)
+	}
+
+	f, err := os.Create(downloadPath)
 	if err != nil {
 		return fmt.Errorf("erreur création fichier: %v", err)
 	}
@@ -247,13 +323,28 @@ func DownloadBackupWithCreds(ctx context.Context, creds S3Credentials, s3Path, d
 	return nil
 }
 
+// getUserDownloadsDir retourne le dossier Downloads de l'utilisateur (Windows/macOS/Linux)
+func getUserDownloadsDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("erreur récupération home: %v", err)
+	}
+	downloadsDir := filepath.Join(home, "Downloads")
+	if err := os.MkdirAll(downloadsDir, 0o755); err != nil {
+		return "", fmt.Errorf("erreur création dossier Downloads: %v", err)
+	}
+	return downloadsDir, nil
+}
+
 // getUserTmpDir retourne un dossier temporaire sécurisé compatible avec tous les OS
 func getUserTmpDir() (string, error) {
-	// Utilise le dossier temporaire du système (compatible Windows, macOS, Linux)
-	baseTmpDir := os.TempDir()
-	
+	downloadsDir, err := getUserDownloadsDir()
+	if err != nil {
+		return "", err
+	}
+
 	// Crée un sous-dossier spécifique à l'application pour éviter les conflits
-	appTmpDir := fmt.Sprintf("%s/aidalinfo-cli-tmp", baseTmpDir)
+	appTmpDir := filepath.Join(downloadsDir, "aidalinfo-cli-tmp")
 	
 	// Vérifie si le dossier existe, sinon le crée
 	if _, err := os.Stat(appTmpDir); os.IsNotExist(err) {
@@ -268,17 +359,17 @@ func getUserTmpDir() (string, error) {
 
 // RestoreMongoBackup télécharge un backup S3 et le restaure dans MongoDB
 func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string, mongoHost, mongoPort, mongoUser, mongoPassword string) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	objectName := s3Path
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	presignedURL, err := generatePresignedURL(ctx, client, bucket, objectName)
@@ -350,7 +441,7 @@ func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string,
 
 // RestoreS3Backup télécharge un backup S3 (tar.gz) et le restaure dans un S3 local (MinIO ou autre)
 func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S3Credentials, s3Path, s3Host, s3Port, s3Region string, s3UseHttps bool) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(cloudCreds)
 	objectName := s3Path
 
 	LogToFrontend("debug", "RestoreS3Backup: Début de la restauration S3")
@@ -358,14 +449,14 @@ func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S
 
 	// Utilise les credentials cloud pour télécharger le backup
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cloudCreds.AccessKey, cloudCreds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 
@@ -857,17 +948,17 @@ func ListMongoDatabases(ctx context.Context, mongoHost, mongoPort, mongoUser, mo
 
 // RestorePostgresBackup télécharge un backup S3 et le restaure dans PostgreSQL
 func RestorePostgresBackup(ctx context.Context, creds S3Credentials, s3Path string, pgHost, pgPort, pgUser, pgPassword, pgDatabase string) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	objectName := s3Path
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	presignedURL, err := generatePresignedURL(ctx, client, bucket, objectName)
@@ -918,6 +1009,36 @@ func RestorePostgresBackup(ctx context.Context, creds S3Credentials, s3Path stri
 	env := os.Environ()
 	if pgPassword != "" {
 		env = append(env, fmt.Sprintf("PGPASSWORD=%s", pgPassword))
+	}
+
+	// Créer la base de données si elle n'existe pas
+	LogToFrontend("info", fmt.Sprintf("Création de la base de données %s si elle n'existe pas...", pgDatabase))
+	
+	// D'abord vérifier si la base existe
+	checkCmd := exec.Command("psql",
+		"-h", pgHost,
+		"-p", pgPort,
+		"-U", pgUser,
+		"-d", "postgres",
+		"-t",
+		"-c", fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname = '%s'", pgDatabase))
+	checkCmd.Env = env
+	checkOutput, _ := checkCmd.Output()
+	
+	// Si la base n'existe pas, la créer
+	if strings.TrimSpace(string(checkOutput)) == "" {
+		createCmd := exec.Command("psql",
+			"-h", pgHost,
+			"-p", pgPort,
+			"-U", pgUser,
+			"-d", "postgres",
+			"-c", fmt.Sprintf("CREATE DATABASE %s", pgDatabase))
+		createCmd.Env = env
+		if err := createCmd.Run(); err != nil {
+			LogToFrontend("error", fmt.Sprintf("Impossible de créer la base: %v", err))
+			return fmt.Errorf("impossible de créer la base de données: %v", err)
+		}
+		LogToFrontend("success", fmt.Sprintf("Base de données %s créée avec succès", pgDatabase))
 	}
 
 	// Décompresser et restaurer avec pg_restore ou psql selon le format
@@ -1091,7 +1212,7 @@ func TransferPostgresDatabase(ctx context.Context, sourceHost, sourcePort, sourc
 		return fmt.Errorf("erreur écriture fichier décompressé: %v", err)
 	}
 
-	// Étape 3: Créer la base de données de destination si elle n'existe pas
+	// Étape 3: Gérer la base de données de destination
 	env := os.Environ()
 	if destPassword != "" {
 		env = append(env, fmt.Sprintf("PGPASSWORD=%s", destPassword))
@@ -1099,6 +1220,7 @@ func TransferPostgresDatabase(ctx context.Context, sourceHost, sourcePort, sourc
 
 	if dropExisting {
 		// Supprimer la base si elle existe
+		LogToFrontend("info", fmt.Sprintf("Suppression de la base %s sur le serveur de destination si elle existe...", database))
 		dropCmd := exec.Command("psql",
 			"-h", destHost,
 			"-p", destPort,
@@ -1106,18 +1228,42 @@ func TransferPostgresDatabase(ctx context.Context, sourceHost, sourcePort, sourc
 			"-d", "postgres",
 			"-c", fmt.Sprintf("DROP DATABASE IF EXISTS %s", database))
 		dropCmd.Env = env
-		dropCmd.Run() // Ignorer l'erreur si la base n'existe pas
+		if err := dropCmd.Run(); err != nil {
+			LogToFrontend("warn", fmt.Sprintf("Impossible de supprimer la base: %v", err))
+		}
 	}
 
-	// Créer la base de données
-	createCmd := exec.Command("psql",
+	// Toujours créer la base de données si elle n'existe pas
+	LogToFrontend("info", fmt.Sprintf("Création de la base %s si elle n'existe pas...", database))
+	
+	// D'abord vérifier si la base existe
+	checkCmd := exec.Command("psql",
 		"-h", destHost,
 		"-p", destPort,
 		"-U", destUser,
 		"-d", "postgres",
-		"-c", fmt.Sprintf("CREATE DATABASE %s", database))
-	createCmd.Env = env
-	createCmd.Run() // Ignorer l'erreur si la base existe déjà
+		"-t",
+		"-c", fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname = '%s'", database))
+	checkCmd.Env = env
+	checkOutput, _ := checkCmd.Output()
+	
+	// Si la base n'existe pas, la créer
+	if strings.TrimSpace(string(checkOutput)) == "" {
+		createCmd := exec.Command("psql",
+			"-h", destHost,
+			"-p", destPort,
+			"-U", destUser,
+			"-d", "postgres",
+			"-c", fmt.Sprintf("CREATE DATABASE %s", database))
+		createCmd.Env = env
+		if err := createCmd.Run(); err != nil {
+			LogToFrontend("error", fmt.Sprintf("Impossible de créer la base: %v", err))
+			return fmt.Errorf("impossible de créer la base de données: %v", err)
+		}
+		LogToFrontend("success", fmt.Sprintf("Base de données %s créée avec succès", database))
+	} else {
+		LogToFrontend("info", fmt.Sprintf("La base de données %s existe déjà", database))
+	}
 
 	// Étape 4: Restaurer sur la destination
 	LogToFrontend("info", fmt.Sprintf("Restauration de %s sur le serveur de destination...", database))

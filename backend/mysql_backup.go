@@ -168,30 +168,50 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 
 		cmdDrop := exec.Command("mysql", dropArgs...)
 		if err := cmdDrop.Run(); err != nil {
-			LogToFrontend("warn", fmt.Sprintf("Impossible de recréer la base: %v", err))
-			// On continue quand même, la base existe peut-être déjà
+			LogToFrontend("warn", fmt.Sprintf("Impossible de supprimer la base: %v", err))
 		}
 	}
 
+	
+	// Toujours créer la base si elle n'existe pas
+	LogToFrontend("info", fmt.Sprintf("Création de la base %s si elle n'existe pas...", database))
+	createDbArgs := []string{
+		"-h", destHost,
+		"-P", destPort,
+		"-u", destUser,
+	}
+	if destPassword != "" {
+		createDbArgs = append(createDbArgs, fmt.Sprintf("-p%s", destPassword))
+	}
+	createArgs := make([]string, len(createDbArgs))
+	copy(createArgs, createDbArgs)
+	createArgs = append(createArgs, "-e", fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", database))
+	cmdCreate := exec.Command("mysql", createArgs...)
+	if output, err := cmdCreate.CombinedOutput(); err != nil {
+		LogToFrontend("error", fmt.Sprintf("Impossible de créer la base %s: %v - Output: %s", database, err, string(output)))
+		return fmt.Errorf("impossible de créer la base de données %s: %v", database, err)
+	}
+	
 	// Étape 3: Restaurer sur la destination
 	LogToFrontend("info", fmt.Sprintf("Restauration de %s sur le serveur MySQL de destination...", database))
 
 	// Décompresser et restaurer
 	cmdGunzip := exec.Command("gunzip", "-c", dumpFile)
+
 	cmdMysql := exec.Command("mysql",
 		"-h", destHost,
 		"-P", destPort,
 		"-u", destUser,
-		fmt.Sprintf("-p%s", destPassword),
 		database,
 	)
 
-	// Si pas de password, ajuster les arguments
-	if destPassword == "" {
+	// Ajouter le password si fourni
+	if destPassword != "" {
 		cmdMysql = exec.Command("mysql",
 			"-h", destHost,
 			"-P", destPort,
 			"-u", destUser,
+			fmt.Sprintf("-p%s", destPassword),
 			database,
 		)
 	}
@@ -231,17 +251,17 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 
 // RestoreMySQLBackup télécharge un backup S3 et le restaure dans MySQL
 func RestoreMySQLBackup(ctx context.Context, creds S3Credentials, s3Path string, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, database string) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	objectName := s3Path
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	presignedURL, err := generatePresignedURL(ctx, client, bucket, objectName)

@@ -39,6 +39,11 @@ export namespace backend {
 	export class S3Credentials {
 	    accessKey: string;
 	    secretKey: string;
+	    host: string;
+	    port: string;
+	    region: string;
+	    useHttps: boolean;
+	    bucket: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new S3Credentials(source);
@@ -48,6 +53,11 @@ export namespace backend {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.accessKey = source["accessKey"];
 	        this.secretKey = source["secretKey"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.region = source["region"];
+	        this.useHttps = source["useHttps"];
+	        this.bucket = source["bucket"];
 	    }
 	}
 	export class TagsResult {
