@@ -1011,6 +1011,36 @@ func RestorePostgresBackup(ctx context.Context, creds S3Credentials, s3Path stri
 		env = append(env, fmt.Sprintf("PGPASSWORD=%s", pgPassword))
 	}
 
+	// Créer la base de données si elle n'existe pas
+	LogToFrontend("info", fmt.Sprintf("Création de la base de données %s si elle n'existe pas...", pgDatabase))
+	
+	// D'abord vérifier si la base existe
+	checkCmd := exec.Command("psql",
+		"-h", pgHost,
+		"-p", pgPort,
+		"-U", pgUser,
+		"-d", "postgres",
+		"-t",
+		"-c", fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname = '%s'", pgDatabase))
+	checkCmd.Env = env
+	checkOutput, _ := checkCmd.Output()
+	
+	// Si la base n'existe pas, la créer
+	if strings.TrimSpace(string(checkOutput)) == "" {
+		createCmd := exec.Command("psql",
+			"-h", pgHost,
+			"-p", pgPort,
+			"-U", pgUser,
+			"-d", "postgres",
+			"-c", fmt.Sprintf("CREATE DATABASE %s", pgDatabase))
+		createCmd.Env = env
+		if err := createCmd.Run(); err != nil {
+			LogToFrontend("error", fmt.Sprintf("Impossible de créer la base: %v", err))
+			return fmt.Errorf("impossible de créer la base de données: %v", err)
+		}
+		LogToFrontend("success", fmt.Sprintf("Base de données %s créée avec succès", pgDatabase))
+	}
+
 	// Décompresser et restaurer avec pg_restore ou psql selon le format
 	LogToFrontend("info", "Début de la restauration PostgreSQL...")
 	
@@ -1182,7 +1212,7 @@ func TransferPostgresDatabase(ctx context.Context, sourceHost, sourcePort, sourc
 		return fmt.Errorf("erreur écriture fichier décompressé: %v", err)
 	}
 
-	// Étape 3: Créer la base de données de destination si elle n'existe pas
+	// Étape 3: Gérer la base de données de destination
 	env := os.Environ()
 	if destPassword != "" {
 		env = append(env, fmt.Sprintf("PGPASSWORD=%s", destPassword))
@@ -1190,6 +1220,7 @@ func TransferPostgresDatabase(ctx context.Context, sourceHost, sourcePort, sourc
 
 	if dropExisting {
 		// Supprimer la base si elle existe
+		LogToFrontend("info", fmt.Sprintf("Suppression de la base %s sur le serveur de destination si elle existe...", database))
 		dropCmd := exec.Command("psql",
 			"-h", destHost,
 			"-p", destPort,
@@ -1197,18 +1228,42 @@ func TransferPostgresDatabase(ctx context.Context, sourceHost, sourcePort, sourc
 			"-d", "postgres",
 			"-c", fmt.Sprintf("DROP DATABASE IF EXISTS %s", database))
 		dropCmd.Env = env
-		dropCmd.Run() // Ignorer l'erreur si la base n'existe pas
+		if err := dropCmd.Run(); err != nil {
+			LogToFrontend("warn", fmt.Sprintf("Impossible de supprimer la base: %v", err))
+		}
 	}
 
-	// Créer la base de données
-	createCmd := exec.Command("psql",
+	// Toujours créer la base de données si elle n'existe pas
+	LogToFrontend("info", fmt.Sprintf("Création de la base %s si elle n'existe pas...", database))
+	
+	// D'abord vérifier si la base existe
+	checkCmd := exec.Command("psql",
 		"-h", destHost,
 		"-p", destPort,
 		"-U", destUser,
 		"-d", "postgres",
-		"-c", fmt.Sprintf("CREATE DATABASE %s", database))
-	createCmd.Env = env
-	createCmd.Run() // Ignorer l'erreur si la base existe déjà
+		"-t",
+		"-c", fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname = '%s'", database))
+	checkCmd.Env = env
+	checkOutput, _ := checkCmd.Output()
+	
+	// Si la base n'existe pas, la créer
+	if strings.TrimSpace(string(checkOutput)) == "" {
+		createCmd := exec.Command("psql",
+			"-h", destHost,
+			"-p", destPort,
+			"-U", destUser,
+			"-d", "postgres",
+			"-c", fmt.Sprintf("CREATE DATABASE %s", database))
+		createCmd.Env = env
+		if err := createCmd.Run(); err != nil {
+			LogToFrontend("error", fmt.Sprintf("Impossible de créer la base: %v", err))
+			return fmt.Errorf("impossible de créer la base de données: %v", err)
+		}
+		LogToFrontend("success", fmt.Sprintf("Base de données %s créée avec succès", database))
+	} else {
+		LogToFrontend("info", fmt.Sprintf("La base de données %s existe déjà", database))
+	}
 
 	// Étape 4: Restaurer sur la destination
 	LogToFrontend("info", fmt.Sprintf("Restauration de %s sur le serveur de destination...", database))

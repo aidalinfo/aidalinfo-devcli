@@ -168,17 +168,30 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 
 		cmdDrop := exec.Command("mysql", dropArgs...)
 		if err := cmdDrop.Run(); err != nil {
-			LogToFrontend("warn", fmt.Sprintf("Impossible de recréer la base: %v", err))
-			// On continue quand même, la base existe peut-être déjà
+			LogToFrontend("warn", fmt.Sprintf("Impossible de supprimer la base: %v", err))
 		}
 	}
 
+	
+	// Toujours créer la base si elle n'existe pas
+	LogToFrontend("info", fmt.Sprintf("Création de la base %s si elle n'existe pas...", database))
+	createArgs := make([]string, len(createDbArgs))
+	copy(createArgs, createDbArgs)
+	createArgs = append(createArgs, "-e", fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", database))
+	cmdCreate := exec.Command("mysql", createArgs...)
+	if output, err := cmdCreate.CombinedOutput(); err != nil {
+		LogToFrontend("error", fmt.Sprintf("Impossible de créer la base %s: %v - Output: %s", database, err, string(output)))
+		return fmt.Errorf("impossible de créer la base de données %s: %v", database, err)
+	}
+	
 	// Étape 3: Restaurer sur la destination
 	LogToFrontend("info", fmt.Sprintf("Restauration de %s sur le serveur MySQL de destination...", database))
 
 	// Décompresser et restaurer
 	cmdGunzip := exec.Command("gunzip", "-c", dumpFile)
-	cmdMysql := exec.Command("mysql",
+	
+	// Construire les arguments mysql
+	mysqlArgs := []string{
 		"-h", destHost,
 		"-P", destPort,
 		"-u", destUser,
