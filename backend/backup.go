@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -297,7 +298,20 @@ func DownloadBackupWithCreds(ctx context.Context, creds S3Credentials, s3Path, d
 		return fmt.Errorf("erreur téléchargement S3: %v", err)
 	}
 	defer resp.Body.Close()
-	f, err := os.Create(destPath)
+
+	downloadPath := destPath
+	if !filepath.IsAbs(destPath) {
+		downloadsDir, err := getUserDownloadsDir()
+		if err != nil {
+			return fmt.Errorf("erreur récupération dossier Downloads: %v", err)
+		}
+		downloadPath = filepath.Join(downloadsDir, destPath)
+	}
+	if err := os.MkdirAll(filepath.Dir(downloadPath), 0o755); err != nil {
+		return fmt.Errorf("erreur création dossier de destination: %v", err)
+	}
+
+	f, err := os.Create(downloadPath)
 	if err != nil {
 		return fmt.Errorf("erreur création fichier: %v", err)
 	}
@@ -309,13 +323,28 @@ func DownloadBackupWithCreds(ctx context.Context, creds S3Credentials, s3Path, d
 	return nil
 }
 
+// getUserDownloadsDir retourne le dossier Downloads de l'utilisateur (Windows/macOS/Linux)
+func getUserDownloadsDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("erreur récupération home: %v", err)
+	}
+	downloadsDir := filepath.Join(home, "Downloads")
+	if err := os.MkdirAll(downloadsDir, 0o755); err != nil {
+		return "", fmt.Errorf("erreur création dossier Downloads: %v", err)
+	}
+	return downloadsDir, nil
+}
+
 // getUserTmpDir retourne un dossier temporaire sécurisé compatible avec tous les OS
 func getUserTmpDir() (string, error) {
-	// Utilise le dossier temporaire du système (compatible Windows, macOS, Linux)
-	baseTmpDir := os.TempDir()
-	
+	downloadsDir, err := getUserDownloadsDir()
+	if err != nil {
+		return "", err
+	}
+
 	// Crée un sous-dossier spécifique à l'application pour éviter les conflits
-	appTmpDir := fmt.Sprintf("%s/aidalinfo-cli-tmp", baseTmpDir)
+	appTmpDir := filepath.Join(downloadsDir, "aidalinfo-cli-tmp")
 	
 	// Vérifie si le dossier existe, sinon le crée
 	if _, err := os.Stat(appTmpDir); os.IsNotExist(err) {

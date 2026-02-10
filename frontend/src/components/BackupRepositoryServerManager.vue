@@ -8,6 +8,7 @@
       v-model="selectedServerId"
       :auto-select-default="true"
       :show-details="true"
+      :show-settings-button="false"
     />
   </div>
 </template>

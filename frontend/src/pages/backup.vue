@@ -67,6 +67,23 @@ const selectedS3ServerId = ref<string>('')
 const showS3ServerModal = ref(false)
 const pendingS3Restore = ref<backend.BackupInfo | null>(null)
 
+const repositoryServer = ref<S3Server | null>(null)
+
+function resolveRepositoryServer(): S3Server | null {
+  const servers = S3ServersManager.getServers()
+  const scalewayServer = servers.find(s => s.host.includes('s3.fr-par.scw.cloud'))
+  return (
+    getBackupRepositoryServer() ||
+    scalewayServer ||
+    S3ServersManager.getDefaultServer() ||
+    null
+  )
+}
+
+function refreshRepositoryServer() {
+  repositoryServer.value = resolveRepositoryServer()
+}
+
 const pagedMongoBackups = computed(() => {
   const start = (mongoPage.value - 1) * PAGE_SIZE
   return mongoBackups.value.slice(start, start + PAGE_SIZE)
@@ -104,21 +121,16 @@ function getCurrentProject() {
 
 function getS3Credentials(): backend.S3Credentials {
   // Utiliser le serveur configuré pour le dépôt de backups, sinon Scaleway si présent, sinon le serveur par défaut
-  const servers = S3ServersManager.getServers()
-  const scalewayServer = servers.find(s => s.host.includes('s3.fr-par.scw.cloud'))
-  const repositoryServer =
-    getBackupRepositoryServer() ||
-    scalewayServer ||
-    S3ServersManager.getDefaultServer()
-  if (repositoryServer) {
+  const repoServer = resolveRepositoryServer()
+  if (repoServer) {
     return new backend.S3Credentials({
-      accessKey: repositoryServer.accessKey,
-      secretKey: repositoryServer.secretKey,
-      host: repositoryServer.host,
-      port: repositoryServer.port,
-      region: repositoryServer.region,
-      useHttps: repositoryServer.useHttps,
-      bucket: repositoryServer.bucket || ''
+      accessKey: repoServer.accessKey,
+      secretKey: repoServer.secretKey,
+      host: repoServer.host,
+      port: repoServer.port,
+      region: repoServer.region,
+      useHttps: repoServer.useHttps,
+      bucket: repoServer.bucket || ''
     })
   }
   // Fallback sur les anciennes clés si pas de serveur configuré
@@ -129,6 +141,7 @@ function getS3Credentials(): backend.S3Credentials {
 }
 
 async function fetchBackups() {
+  refreshRepositoryServer()
   loading.value = true
   error.value = ''
   mongoBackups.value = []
@@ -244,20 +257,21 @@ async function restoreMySQL() {
 }
 
 function selectS3ServerForRestore(file: backend.BackupInfo) {
-  const servers = S3ServersManager.getServers()
-  if (servers.length <= 1) {
-    const server = servers[0] || S3ServersManager.getDefaultServer()
-    if (!server) {
-      toast.error('Aucun serveur S3/MinIO configuré')
-      return
-    }
-    void restoreS3WithServer(file, server)
+  const repositoryServer = resolveRepositoryServer()
+  const servers = S3ServersManager
+    .getServers()
+    .filter(s => !repositoryServer || s.id !== repositoryServer.id)
+  if (servers.length === 0) {
+    toast.error('Aucun serveur S3/MinIO disponible pour la restauration')
     return
   }
 
   pendingS3Restore.value = file
   const defaultServer = S3ServersManager.getDefaultServer()
-  selectedS3ServerId.value = defaultServer?.id || servers[0]?.id || ''
+  selectedS3ServerId.value =
+    (defaultServer && servers.find(s => s.id === defaultServer.id) ? defaultServer.id : '') ||
+    servers[0]?.id ||
+    ''
   showS3ServerModal.value = true
 }
 
@@ -265,7 +279,7 @@ async function restoreS3WithServer(file: backend.BackupInfo, server: S3Server) {
   const cloudCreds = getS3Credentials()
   const current = getCurrentProject()
   const { host, port, accessKey, secretKey, region, useHttps } = getS3ConnectionParams(server)
-  const localCreds = { accessKey, secretKey }
+  const localCreds = new backend.S3Credentials({ accessKey, secretKey })
   
   toast.info(`Restauration S3 sur ${server.name} en cours...`)
   try {
@@ -340,6 +354,16 @@ async function downloadBackup(file: backend.BackupInfo, type: 'mongo' | 'mysql' 
           <SelectItem v-for="p in PROJECTS" :key="p.value" :value="p.value">{{ p.label }}</SelectItem>
         </SelectContent>
       </Select>
+    </div>
+    <div class="mb-4">
+      <Label>Backup Repository Server</Label>
+      <div v-if="repositoryServer" class="mt-1 text-sm text-muted-foreground">
+        {{ repositoryServer.name }} — {{ repositoryServer.host }}:{{ repositoryServer.port }}
+        <span v-if="repositoryServer.bucket"> (bucket: {{ repositoryServer.bucket }})</span>
+      </div>
+      <div v-else class="mt-1 text-sm text-red-600">
+        Aucun serveur S3 configuré pour les backups
+      </div>
     </div>
     <Button @click="fetchBackups" :disabled="loading" class="mb-6">
       {{ loading ? 'Chargement...' : 'Rafraîchir la liste des backups' }}
@@ -564,6 +588,7 @@ async function downloadBackup(file: backend.BackupInfo, type: 'mongo' | 'mysql' 
         v-model="selectedS3ServerId"
         :auto-select-default="true"
         :show-details="true"
+        :exclude-server-id="repositoryServer?.id"
       />
       
       <div class="flex justify-end gap-3 mt-6">
