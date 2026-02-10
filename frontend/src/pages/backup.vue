@@ -25,9 +25,9 @@ import type { MongoServer } from '@/utils/mongoServers'
 import MySQLServerSelector from '@/components/MySQLServerSelector.vue'
 import { MySQLServersManager, getMySQLConnectionParams } from '@/utils/mysqlServers'
 import type { MySQLServer } from '@/utils/mysqlServers'
-import S3ServerSelector from '@/components/S3ServerSelector.vue'
-import { S3ServersManager, getS3ConnectionParams } from '@/utils/s3Servers'
+import { S3ServersManager, getBackupRepositoryServer, getS3ConnectionParams } from '@/utils/s3Servers'
 import type { S3Server } from '@/utils/s3Servers'
+import S3ServerSelector from '@/components/S3ServerSelector.vue'
 
 const PROJECTS = [
   { label: 'Sat&Lease V2', value: 'Sat&LeaseV2', mongo: 'backup/prod-sateleasev2/mongo/', mysql: 'backup/prod-sateleasev2/mysql/', bucket: 'backup/prod-sateleasev2/bucket/' },
@@ -103,12 +103,22 @@ function getCurrentProject() {
 }
 
 function getS3Credentials(): backend.S3Credentials {
-  // Utiliser le serveur S3 par défaut pour la récupération des backups
-  const defaultServer = S3ServersManager.getDefaultServer()
-  if (defaultServer) {
+  // Utiliser le serveur configuré pour le dépôt de backups, sinon Scaleway si présent, sinon le serveur par défaut
+  const servers = S3ServersManager.getServers()
+  const scalewayServer = servers.find(s => s.host.includes('s3.fr-par.scw.cloud'))
+  const repositoryServer =
+    getBackupRepositoryServer() ||
+    scalewayServer ||
+    S3ServersManager.getDefaultServer()
+  if (repositoryServer) {
     return new backend.S3Credentials({
-      accessKey: defaultServer.accessKey,
-      secretKey: defaultServer.secretKey
+      accessKey: repositoryServer.accessKey,
+      secretKey: repositoryServer.secretKey,
+      host: repositoryServer.host,
+      port: repositoryServer.port,
+      region: repositoryServer.region,
+      useHttps: repositoryServer.useHttps,
+      bucket: repositoryServer.bucket || ''
     })
   }
   // Fallback sur les anciennes clés si pas de serveur configuré
@@ -234,22 +244,24 @@ async function restoreMySQL() {
 }
 
 function selectS3ServerForRestore(file: backend.BackupInfo) {
+  const servers = S3ServersManager.getServers()
+  if (servers.length <= 1) {
+    const server = servers[0] || S3ServersManager.getDefaultServer()
+    if (!server) {
+      toast.error('Aucun serveur S3/MinIO configuré')
+      return
+    }
+    void restoreS3WithServer(file, server)
+    return
+  }
+
   pendingS3Restore.value = file
+  const defaultServer = S3ServersManager.getDefaultServer()
+  selectedS3ServerId.value = defaultServer?.id || servers[0]?.id || ''
   showS3ServerModal.value = true
 }
 
-async function restoreS3() {
-  if (!pendingS3Restore.value || !selectedS3ServerId.value) {
-    toast.error('Veuillez sélectionner un serveur S3/MinIO')
-    return
-  }
-  
-  const server = S3ServersManager.getServer(selectedS3ServerId.value)
-  if (!server) {
-    toast.error('Serveur S3/MinIO introuvable')
-    return
-  }
-  
+async function restoreS3WithServer(file: backend.BackupInfo, server: S3Server) {
   const cloudCreds = getS3Credentials()
   const current = getCurrentProject()
   const { host, port, accessKey, secretKey, region, useHttps } = getS3ConnectionParams(server)
@@ -261,19 +273,32 @@ async function restoreS3() {
     await RestoreS3Backup(
       cloudCreds,
       localCreds,
-      current.bucket + pendingS3Restore.value.name,
+      current.bucket + file.name,
       host,
       port,
       region,
       useHttps
     )
     toast.success(`Restauration S3 sur ${server.name} terminée avec succès !`)
-    showS3ServerModal.value = false
-    pendingS3Restore.value = null
-    selectedS3ServerId.value = ''
   } catch (e: any) {
     toast.error('Erreur restauration S3 : ' + (e.message || e.toString()))
   }
+}
+
+async function restoreS3FromModal() {
+  if (!pendingS3Restore.value || !selectedS3ServerId.value) {
+    toast.error('Veuillez sélectionner un serveur S3/MinIO')
+    return
+  }
+  const server = S3ServersManager.getServer(selectedS3ServerId.value)
+  if (!server) {
+    toast.error('Serveur S3/MinIO introuvable')
+    return
+  }
+  await restoreS3WithServer(pendingS3Restore.value, server)
+  showS3ServerModal.value = false
+  pendingS3Restore.value = null
+  selectedS3ServerId.value = ''
 }
 
 // Fonction générique de téléchargement
@@ -546,7 +571,7 @@ async function downloadBackup(file: backend.BackupInfo, type: 'mongo' | 'mysql' 
           Annuler
         </Button>
         <Button 
-          @click="restoreS3" 
+          @click="restoreS3FromModal" 
           :disabled="!selectedS3ServerId"
         >
           Restaurer
@@ -554,4 +579,5 @@ async function downloadBackup(file: backend.BackupInfo, type: 'mongo' | 'mysql' 
       </div>
     </div>
   </div>
+
 </template>

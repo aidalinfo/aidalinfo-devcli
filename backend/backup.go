@@ -25,6 +25,68 @@ const S3Region = "fr-par"
 type S3Credentials struct {
 	AccessKey string `json:"accessKey"`
 	SecretKey string `json:"secretKey"`
+	Host      string `json:"host"`
+	Port      string `json:"port"`
+	Region    string `json:"region"`
+	UseHttps  bool   `json:"useHttps"`
+	Bucket    string `json:"bucket"`
+}
+
+func resolveS3Config(creds S3Credentials) (bucket string, region string, endpoint string) {
+	bucket = strings.TrimSpace(creds.Bucket)
+	if bucket == "" {
+		bucket = "backup-global"
+	}
+
+	host := strings.TrimSpace(creds.Host)
+	if host == "" {
+		host = S3BaseURL
+	}
+	host = strings.TrimPrefix(host, "http://")
+	host = strings.TrimPrefix(host, "https://")
+	host = strings.TrimSuffix(host, "/")
+
+	hostOnly := host
+	hostPort := ""
+	if h, p, err := net.SplitHostPort(host); err == nil {
+		hostOnly = h
+		hostPort = p
+	}
+
+	region = strings.TrimSpace(creds.Region)
+	if region == "" {
+		region = S3Region
+	}
+
+	port := strings.TrimSpace(creds.Port)
+	if port == "" {
+		port = hostPort
+	}
+
+	useHttps := creds.UseHttps
+	if creds.Host == "" && port == "" {
+		useHttps = true
+	}
+	protocol := "https"
+	if !useHttps {
+		protocol = "http"
+	}
+
+	defaultPort := "80"
+	if useHttps {
+		defaultPort = "443"
+	}
+	if port == defaultPort {
+		port = ""
+	}
+
+	endpointHost := hostOnly
+	if port != "" {
+		endpointHost = net.JoinHostPort(hostOnly, port)
+	}
+
+	endpoint = fmt.Sprintf("%s://%s", protocol, endpointHost)
+	return bucket, region, endpoint
 }
 
 // BackupInfo structure for frontend (nom, taille, date)
@@ -36,17 +98,17 @@ type BackupInfo struct {
 
 // ListBackupsWithCreds liste les backups S3 avec infos (nom, taille, date) - exclut les backups Glacier
 func ListBackupsWithCreds(ctx context.Context, creds S3Credentials, s3Dir string) ([]BackupInfo, error) {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	prefix := s3Dir
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	var files []BackupInfo
@@ -213,17 +275,17 @@ func downloadWithRetry(url string, maxAttempts int, timeout time.Duration) (io.R
 
 // DownloadBackupWithCreds télécharge un backup S3 avec credentials fournis (bucket privé, signature S3 via AWS SDK)
 func DownloadBackupWithCreds(ctx context.Context, creds S3Credentials, s3Path, destPath string) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	objectName := s3Path
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	getObjInput := &s3.GetObjectInput{
@@ -268,17 +330,17 @@ func getUserTmpDir() (string, error) {
 
 // RestoreMongoBackup télécharge un backup S3 et le restaure dans MongoDB
 func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string, mongoHost, mongoPort, mongoUser, mongoPassword string) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	objectName := s3Path
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	presignedURL, err := generatePresignedURL(ctx, client, bucket, objectName)
@@ -350,7 +412,7 @@ func RestoreMongoBackup(ctx context.Context, creds S3Credentials, s3Path string,
 
 // RestoreS3Backup télécharge un backup S3 (tar.gz) et le restaure dans un S3 local (MinIO ou autre)
 func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S3Credentials, s3Path, s3Host, s3Port, s3Region string, s3UseHttps bool) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(cloudCreds)
 	objectName := s3Path
 
 	LogToFrontend("debug", "RestoreS3Backup: Début de la restauration S3")
@@ -358,14 +420,14 @@ func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S
 
 	// Utilise les credentials cloud pour télécharger le backup
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cloudCreds.AccessKey, cloudCreds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 
@@ -857,17 +919,17 @@ func ListMongoDatabases(ctx context.Context, mongoHost, mongoPort, mongoUser, mo
 
 // RestorePostgresBackup télécharge un backup S3 et le restaure dans PostgreSQL
 func RestorePostgresBackup(ctx context.Context, creds S3Credentials, s3Path string, pgHost, pgPort, pgUser, pgPassword, pgDatabase string) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	objectName := s3Path
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	presignedURL, err := generatePresignedURL(ctx, client, bucket, objectName)

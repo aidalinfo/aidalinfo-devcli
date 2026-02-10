@@ -231,17 +231,17 @@ func TransferMySQLDatabase(ctx context.Context, sourceHost, sourcePort, sourceUs
 
 // RestoreMySQLBackup télécharge un backup S3 et le restaure dans MySQL
 func RestoreMySQLBackup(ctx context.Context, creds S3Credentials, s3Path string, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, database string) error {
-	bucket := "backup-global"
+	bucket, region, endpoint := resolveS3Config(creds)
 	objectName := s3Path
 	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(S3Region),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(creds.AccessKey, creds.SecretKey, "")),
 	)
 	if err != nil {
 		return fmt.Errorf("erreur chargement config AWS: %v", err)
 	}
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.EndpointResolver = s3.EndpointResolverFromURL("https://" + S3BaseURL)
+		o.EndpointResolver = s3.EndpointResolverFromURL(endpoint)
 		o.UsePathStyle = true
 	})
 	presignedURL, err := generatePresignedURL(ctx, client, bucket, objectName)

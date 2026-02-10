@@ -9,6 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     Action: typeof import('./src/components/Action.vue')['default']
+    BackupRepositoryServerManager: typeof import('./src/components/BackupRepositoryServerManager.vue')['default']
     Badge: typeof import('./src/components/ui/badge/Badge.vue')['default']
     Button: typeof import('./src/components/ui/button/Button.vue')['default']
     Card: typeof import('./src/components/ui/card/Card.vue')['default']

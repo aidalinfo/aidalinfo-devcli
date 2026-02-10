@@ -14,6 +14,7 @@ export interface S3Server {
 }
 
 const STORAGE_KEY = 's3Servers';
+const BACKUP_REPOSITORY_SERVER_KEY = 'backupRepositoryServerId';
 
 export class S3ServersManager {
   static getServers(): S3Server[] {
@@ -228,6 +229,28 @@ export class S3ServersManager {
   private static generateId(): string {
     return `s3_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
+}
+
+export function getBackupRepositoryServerId(): string | null {
+  return localStorage.getItem(BACKUP_REPOSITORY_SERVER_KEY);
+}
+
+export function setBackupRepositoryServerId(id: string): void {
+  localStorage.setItem(BACKUP_REPOSITORY_SERVER_KEY, id);
+}
+
+export function clearBackupRepositoryServerId(): void {
+  localStorage.removeItem(BACKUP_REPOSITORY_SERVER_KEY);
+}
+
+export function getBackupRepositoryServer(): S3Server | undefined {
+  const id = getBackupRepositoryServerId();
+  if (!id) return undefined;
+  const server = S3ServersManager.getServer(id);
+  if (!server) {
+    clearBackupRepositoryServerId();
+  }
+  return server;
 }
 
 export function getS3ConnectionParams(server: S3Server): {
