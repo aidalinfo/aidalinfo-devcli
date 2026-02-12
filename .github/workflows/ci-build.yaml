@@ -29,9 +29,6 @@ jobs:
             platform: 'darwin/arm64'
             os: 'macos-latest'
             build-tags: ''
-          - name: 'App'
-            platform:  'windows/amd64'
-            os: 'windows-latest'
             
     runs-on: ${{ matrix.build.os }}
     steps:
@@ -118,14 +115,22 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build wails
-        uses: host-uk/build@v4
-        id: build
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          build-name: ${{ matrix.build.name }}
-          build-platform: ${{ matrix.build.platform }}
-          package: false
           go-version: '1.24.3'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build
+        shell: bash
+        run: wails build -platform windows/amd64
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
