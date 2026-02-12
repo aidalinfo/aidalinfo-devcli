@@ -29,7 +29,10 @@ jobs:
             platform: 'darwin/arm64'
             os: 'macos-latest'
             build-tags: ''
-
+          - name: 'App'
+            platform:  'windows/amd64'
+            os: 'windows-latest'
+            
     runs-on: ${{ matrix.build.os }}
     steps:
       - name: Checkout
@@ -78,13 +81,76 @@ jobs:
               ;;
           esac
 
+      - name: Upload Linux artifact
+        if: matrix.build.platform == 'linux/amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: aidalinfo-cli_linux_amd64
+          path: build/bin/aidalinfo-cli_linux_amd64
+
+      - name: Upload macOS amd64 artifact
+        if: matrix.build.platform == 'darwin/amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: aidalinfo-cli_darwin_amd64
+          path: build/bin/aidalinfo-cli_darwin_amd64.tar.gz
+
+      - name: Upload macOS arm64 artifact
+        if: matrix.build.platform == 'darwin/arm64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: aidalinfo-cli_darwin_arm64
+          path: build/bin/aidalinfo-cli_darwin_arm64.tar.gz
+
+  build-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+          - name: 'App'
+            platform: 'windows/amd64'
+            os: 'windows-latest'
+
+    runs-on: ${{ matrix.build.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Build wails
+        uses: dAppServer/wails-build-action@v2.2
+        id: build
+        with:
+          build-name: ${{ matrix.build.name }}
+          build-platform: ${{ matrix.build.platform }}
+          package: false
+          go-version: '1.24.3'
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aidalinfo-cli_windows_amd64
+          path: build/bin/aidalinfo-cli.exe
+
+  release:
+    needs:
+      - build
+      - build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
 
       - name: Create release and upload artifacts
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/bin/aidalinfo-cli_linux_amd64
-            build/bin/aidalinfo-cli_darwin_amd64.tar.gz
-            build/bin/aidalinfo-cli_darwin_arm64.tar.gz
+            dist/**/aidalinfo-cli_linux_amd64
+            dist/**/aidalinfo-cli_darwin_amd64.tar.gz
+            dist/**/aidalinfo-cli_darwin_arm64.tar.gz
+            dist/**/aidalinfo-cli.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
