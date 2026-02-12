@@ -106,6 +106,10 @@ export function NpmUpdateAction(arg1) {
   return window['go']['main']['App']['NpmUpdateAction'](arg1);
 }
 
+export function OpenS3BackupFileDialog() {
+  return window['go']['main']['App']['OpenS3BackupFileDialog']();
+}
+
 export function PerformUpdate(arg1) {
   return window['go']['main']['App']['PerformUpdate'](arg1);
 }
@@ -124,6 +128,10 @@ export function RestorePostgresBackup(arg1, arg2, arg3, arg4, arg5, arg6, arg7) 
 
 export function RestoreS3Backup(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['RestoreS3Backup'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function RestoreS3BackupFromLocal(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['RestoreS3BackupFromLocal'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function TagAction(arg1, arg2) {

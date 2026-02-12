@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -640,7 +641,46 @@ func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S
 
 	LogToFrontend("debug", fmt.Sprintf("Téléchargement terminé, %.2f MB téléchargés", float64(written)/(1024*1024)))
 
-	// Le reste du code reste identique (décompression et restauration)
+	if err := restoreS3FromArchive(ctx, localCreds, tmpFilePath, tmpDir, s3Host, s3Port, s3Region, s3UseHttps); err != nil {
+		return err
+	}
+
+	if err := os.Remove(tmpFilePath); err != nil {
+		LogToFrontend("warn", fmt.Sprintf("Impossible de supprimer le fichier temporaire: %v", err))
+	}
+
+	LogToFrontend("success", "Restauration S3 terminée avec succès.")
+	return nil
+}
+
+// RestoreS3BackupFromLocal restaure un backup S3 local (tar.gz) déjà téléchargé vers un S3 local (MinIO ou autre)
+func RestoreS3BackupFromLocal(ctx context.Context, localCreds S3Credentials, localArchivePath, s3Host, s3Port, s3Region string, s3UseHttps bool) error {
+	archivePath := strings.TrimSpace(localArchivePath)
+	if archivePath == "" {
+		return fmt.Errorf("chemin du backup local vide")
+	}
+	if _, err := os.Stat(archivePath); err != nil {
+		return fmt.Errorf("fichier de backup local introuvable: %v", err)
+	}
+
+	LogToFrontend("debug", "RestoreS3BackupFromLocal: Début de la restauration S3 depuis un fichier local")
+	LogToFrontend("debug", fmt.Sprintf("Archive locale: %s", archivePath))
+
+	tmpDir, err := getUserTmpDir()
+	if err != nil {
+		LogToFrontend("error", fmt.Sprintf("Erreur récupération dossier tmp: %v", err))
+		return err
+	}
+
+	if err := restoreS3FromArchive(ctx, localCreds, archivePath, tmpDir, s3Host, s3Port, s3Region, s3UseHttps); err != nil {
+		return err
+	}
+
+	LogToFrontend("success", "Restauration S3 terminée avec succès.")
+	return nil
+}
+
+func restoreS3FromArchive(ctx context.Context, localCreds S3Credentials, archivePath, tmpDir, s3Host, s3Port, s3Region string, s3UseHttps bool) error {
 	LogToFrontend("debug", "Début de la décompression...")
 
 	// Décompresse le tar.gz dans un dossier temporaire
@@ -651,7 +691,7 @@ func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S
 	}
 	defer os.RemoveAll(extractDir)
 	LogToFrontend("debug", fmt.Sprintf("Extraction tar.gz dans: %s", extractDir))
-	cmdTar := exec.Command("tar", "-xzf", tmpFilePath, "-C", extractDir)
+	cmdTar := exec.Command("tar", "-xzf", archivePath, "-C", extractDir)
 	cmdTar.Stdout = os.Stdout
 	cmdTar.Stderr = os.Stderr
 	if err := cmdTar.Run(); err != nil {
@@ -675,7 +715,7 @@ func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S
 	if s3UseHttps {
 		protocol = "https"
 	}
-	
+
 	s3LocalCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(s3Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(localCreds.AccessKey, localCreds.SecretKey, "")),
@@ -724,6 +764,10 @@ func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S
 	}
 
 	// Upload des fichiers avec barre de progression
+	uploader := manager.NewUploader(localClient, func(u *manager.Uploader) {
+		u.PartSize = 16 * 1024 * 1024
+	})
+
 	uploadedFiles := 0
 	for _, entry := range dirEntries {
 		if entry.IsDir() {
@@ -740,15 +784,21 @@ func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S
 		}
 
 		fileInfo, err := f.Stat()
-		if err == nil && fileInfo.Size() > 10*1024*1024 {
+		if err != nil {
+			f.Close()
+			LogToFrontend("error", fmt.Sprintf("Erreur stat fichier à restaurer: %v", err))
+			return fmt.Errorf("erreur stat fichier à restaurer: %v", err)
+		}
+		if fileInfo.Size() > 10*1024*1024 {
 			LogToFrontend("debug", fmt.Sprintf("Fichier volumineux: %.2f MB", float64(fileInfo.Size())/(1024*1024)))
 		}
 
 		name := entry.Name()
-		_, err = localClient.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: &bucketDir,
-			Key:    &name,
-			Body:   f,
+		_, err = uploader.Upload(ctx, &s3.PutObjectInput{
+			Bucket:        &bucketDir,
+			Key:           &name,
+			Body:          f,
+			ContentLength: aws.Int64(fileInfo.Size()),
 		})
 		f.Close()
 
@@ -758,10 +808,6 @@ func RestoreS3Backup(ctx context.Context, cloudCreds S3Credentials, localCreds S
 		}
 	}
 
-	// Supprime le fichier temporaire une fois terminé
-	os.Remove(tmpFilePath)
-
-	LogToFrontend("success", "Restauration S3 terminée avec succès.")
 	return nil
 }
 

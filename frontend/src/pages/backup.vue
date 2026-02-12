@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { ListBackupsWithCreds, RestoreMongoBackup, RestoreMySQLBackup, RestoreS3Backup, DownloadBackupWithCreds } from '../../wailsjs/go/main/App'
+import { ListBackupsWithCreds, RestoreMongoBackup, RestoreMySQLBackup, RestoreS3Backup, RestoreS3BackupFromLocal, DownloadBackupWithCreds, OpenS3BackupFileDialog } from '../../wailsjs/go/main/App'
 import { backend } from '../../wailsjs/go/models'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import {
@@ -66,6 +66,9 @@ const mysqlDatabaseName = ref<string>('')
 const selectedS3ServerId = ref<string>('')
 const showS3ServerModal = ref(false)
 const pendingS3Restore = ref<backend.BackupInfo | null>(null)
+const selectedS3LocalServerId = ref<string>('')
+const showS3LocalModal = ref(false)
+const localS3BackupPath = ref<string>('')
 
 const repositoryServer = ref<S3Server | null>(null)
 
@@ -275,6 +278,35 @@ function selectS3ServerForRestore(file: backend.BackupInfo) {
   showS3ServerModal.value = true
 }
 
+function openS3LocalRestore() {
+  const repositoryServer = resolveRepositoryServer()
+  const servers = S3ServersManager
+    .getServers()
+    .filter(s => !repositoryServer || s.id !== repositoryServer.id)
+  if (servers.length === 0) {
+    toast.error('Aucun serveur S3/MinIO disponible pour la restauration')
+    return
+  }
+
+  const defaultServer = S3ServersManager.getDefaultServer()
+  selectedS3LocalServerId.value =
+    (defaultServer && servers.find(s => s.id === defaultServer.id) ? defaultServer.id : '') ||
+    servers[0]?.id ||
+    ''
+  showS3LocalModal.value = true
+}
+
+async function pickLocalS3Backup() {
+  try {
+    const path = await OpenS3BackupFileDialog()
+    if (path) {
+      localS3BackupPath.value = path
+    }
+  } catch (e: any) {
+    toast.error('Erreur ouverture fichier : ' + (e.message || e.toString()))
+  }
+}
+
 async function restoreS3WithServer(file: backend.BackupInfo, server: S3Server) {
   const cloudCreds = getS3Credentials()
   const current = getCurrentProject()
@@ -313,6 +345,40 @@ async function restoreS3FromModal() {
   showS3ServerModal.value = false
   pendingS3Restore.value = null
   selectedS3ServerId.value = ''
+}
+
+async function restoreS3LocalFromModal() {
+  if (!selectedS3LocalServerId.value || !localS3BackupPath.value.trim()) {
+    toast.error('Veuillez sélectionner un serveur S3/MinIO et entrer un chemin de backup local')
+    return
+  }
+  const server = S3ServersManager.getServer(selectedS3LocalServerId.value)
+  if (!server) {
+    toast.error('Serveur S3/MinIO introuvable')
+    return
+  }
+
+  const { host, port, accessKey, secretKey, region, useHttps } = getS3ConnectionParams(server)
+  const localCreds = new backend.S3Credentials({ accessKey, secretKey })
+  const archivePath = localS3BackupPath.value.trim()
+
+  toast.info(`Restauration S3 depuis fichier local sur ${server.name} en cours...`)
+  try {
+    await RestoreS3BackupFromLocal(
+      localCreds,
+      archivePath,
+      host,
+      port,
+      region,
+      useHttps
+    )
+    toast.success(`Restauration S3 sur ${server.name} terminée avec succès !`)
+    showS3LocalModal.value = false
+    selectedS3LocalServerId.value = ''
+    localS3BackupPath.value = ''
+  } catch (e: any) {
+    toast.error('Erreur restauration S3 : ' + (e.message || e.toString()))
+  }
 }
 
 // Fonction générique de téléchargement
@@ -462,6 +528,12 @@ async function downloadBackup(file: backend.BackupInfo, type: 'mongo' | 'mysql' 
         <CardDescription>Liste des backups du stockage S3 pour le projet sélectionné.</CardDescription>
       </CardHeader>
       <CardContent>
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-sm text-muted-foreground">Restaurer depuis un backup local déjà téléchargé.</span>
+          <Button variant="outline" @click="openS3LocalRestore">
+            Restaurer depuis un fichier local
+          </Button>
+        </div>
         <Table>
           <TableCaption>Backups S3 disponibles</TableCaption>
           <TableHeader>
@@ -598,6 +670,47 @@ async function downloadBackup(file: backend.BackupInfo, type: 'mongo' | 'mysql' 
         <Button 
           @click="restoreS3FromModal" 
           :disabled="!selectedS3ServerId"
+        >
+          Restaurer
+        </Button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal pour restauration S3 depuis un backup local -->
+  <div v-if="showS3LocalModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+      <h3 class="text-lg font-semibold mb-4">Restaurer un backup S3 local</h3>
+
+      <div class="mb-4">
+        <Label for="local-s3-backup-path">Chemin du backup local (.tar.gz)</Label>
+        <div class="flex items-center gap-2 mt-1">
+          <Input
+            id="local-s3-backup-path"
+            v-model="localS3BackupPath"
+            placeholder="Sélectionnez un fichier .tar.gz"
+            readonly
+          />
+          <Button variant="outline" @click="pickLocalS3Backup">
+            Parcourir
+          </Button>
+        </div>
+      </div>
+
+      <S3ServerSelector
+        v-model="selectedS3LocalServerId"
+        :auto-select-default="true"
+        :show-details="true"
+        :exclude-server-id="repositoryServer?.id"
+      />
+
+      <div class="flex justify-end gap-3 mt-6">
+        <Button variant="outline" @click="showS3LocalModal = false">
+          Annuler
+        </Button>
+        <Button
+          @click="restoreS3LocalFromModal"
+          :disabled="!selectedS3LocalServerId || !localS3BackupPath.trim()"
         >
           Restaurer
         </Button>

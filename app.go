@@ -151,6 +151,32 @@ func (a *App) RestoreS3Backup(cloudCreds backend.S3Credentials, localCreds backe
 	return backend.RestoreS3Backup(a.ctx, cloudCreds, localCreds, s3Path, s3Host, s3Port, s3Region, s3UseHttps)
 }
 
+// Expose RestoreS3BackupFromLocal to frontend
+// wailsjs/go/main/App.d.ts doit être régénéré pour :
+// export function RestoreS3BackupFromLocal(localCreds: backend.S3Credentials, localArchivePath: string, s3Host: string, s3Port: string, s3Region: string, s3UseHttps: boolean): Promise<void>;
+func (a *App) RestoreS3BackupFromLocal(localCreds backend.S3Credentials, localArchivePath, s3Host, s3Port, s3Region string, s3UseHttps bool) error {
+	return backend.RestoreS3BackupFromLocal(a.ctx, localCreds, localArchivePath, s3Host, s3Port, s3Region, s3UseHttps)
+}
+
+// OpenS3BackupFileDialog ouvre un sélecteur de fichier pour les backups S3 locaux
+// wailsjs/go/main/App.d.ts doit être régénéré pour :
+// export function OpenS3BackupFileDialog(): Promise<string>;
+func (a *App) OpenS3BackupFileDialog() (string, error) {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Sélectionner un backup S3 (.tar.gz)",
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "Backups S3",
+				Pattern:     "*.tar.gz;*.tgz",
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // Expose MongoDB transfer functions to frontend
 func (a *App) ListMongoDatabases(mongoHost, mongoPort, mongoUser, mongoPassword string) ([]string, error) {
 	return backend.ListMongoDatabases(a.ctx, mongoHost, mongoPort, mongoUser, mongoPassword)

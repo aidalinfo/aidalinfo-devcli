@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -45,11 +46,21 @@ func BackupToS3(projectPath string, s3Bucket string) error {
 	}
 	defer file.Close()
 
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("erreur stat fichier: %v", err)
+	}
+
 	key := fmt.Sprintf("cli-backups/%s", archiveName)
-	_, err = client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: &s3Bucket,
-		Key:    &key,
-		Body:   file,
+	uploader := manager.NewUploader(client, func(u *manager.Uploader) {
+		u.PartSize = 16 * 1024 * 1024
+	})
+	size := fileInfo.Size()
+	_, err = uploader.Upload(ctx, &s3.PutObjectInput{
+		Bucket:        &s3Bucket,
+		Key:           &key,
+		Body:          file,
+		ContentLength: &size,
 	})
 
 	if err != nil {
