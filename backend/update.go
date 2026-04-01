@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,6 +25,9 @@ type UpdateInfo struct {
 	UpdateAvailable bool   `json:"updateAvailable"`
 	DownloadURL     string `json:"downloadUrl"`
 }
+
+// ErrSudoRequired is returned when sudo privileges are required
+var ErrSudoRequired = errors.New("sudo_required")
 
 func GetCurrentVersion() string {
 	return CURRENT_VERSION
@@ -167,22 +171,68 @@ func PerformUpdate(tmpFilePath string) error {
 	backupPath := currentExe + ".backup"
 	err = os.Rename(currentExe, backupPath)
 	if err != nil {
-		cmd := exec.Command("sudo", "mv", currentExe, backupPath)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("erreur lors de la sauvegarde de l'ancien binaire: %v", err)
+		// Si on ne peut pas renommer, on a besoin de sudo
+		if os.IsPermission(err) {
+			return ErrSudoRequired
 		}
+		return fmt.Errorf("erreur lors de la sauvegarde de l'ancien binaire: %v", err)
 	}
 
 	err = os.Rename(tmpFilePath, currentExe)
 	if err != nil {
-		cmd := exec.Command("sudo", "mv", tmpFilePath, currentExe)
-		if err := cmd.Run(); err != nil {
-			os.Rename(backupPath, currentExe)
-			return fmt.Errorf("erreur lors du remplacement du binaire: %v", err)
+		// Restaurer l'ancien binaire
+		os.Rename(backupPath, currentExe)
+		// Si on ne peut pas renommer, on a besoin de sudo
+		if os.IsPermission(err) {
+			return ErrSudoRequired
 		}
+		return fmt.Errorf("erreur lors du remplacement du binaire: %v", err)
 	}
 
 	os.Remove(backupPath)
+
+	return nil
+}
+
+// PerformUpdateWithPassword performs the update using sudo with the provided password
+func PerformUpdateWithPassword(tmpFilePath string, password string) error {
+	currentExe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("erreur lors de la récupération du chemin de l'exécutable: %v", err)
+	}
+
+	currentExe, err = filepath.EvalSymlinks(currentExe)
+	if err != nil {
+		return fmt.Errorf("erreur lors de la résolution du symlink: %v", err)
+	}
+
+	backupPath := currentExe + ".backup"
+	
+	// Créer un script pour effectuer la mise à jour
+	script := fmt.Sprintf(`#!/bin/bash
+mv "%s" "%s" || exit 1
+mv "%s" "%s" || { mv "%s" "%s"; exit 1; }
+rm -f "%s"
+`, 
+		currentExe, backupPath, 
+		tmpFilePath, currentExe,
+		backupPath, currentExe,
+		backupPath)
+	
+	// Utiliser sudo avec le mot de passe fourni
+	cmd := exec.Command("sudo", "-S", "bash", "-c", script)
+	cmd.Stdin = strings.NewReader(password + "\n")
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Vérifier si c'est une erreur d'authentification
+		if strings.Contains(string(output), "incorrect password") || 
+		   strings.Contains(string(output), "Désolé, essayez de nouveau") ||
+		   strings.Contains(string(output), "Sorry, try again") {
+			return fmt.Errorf("mot de passe incorrect")
+		}
+		return fmt.Errorf("erreur lors de la mise à jour: %v - %s", err, string(output))
+	}
 
 	return nil
 }
